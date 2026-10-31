@@ -16,17 +16,21 @@ import threading
 import time
 
 G = 9.80665
-WHO_AM_I_OK = {0x68: "MPU-6050", 0x70: "MPU-6500", 0x71: "MPU-9250", 0x73: "MPU-9255", 0x72: "MPU-6500"}
+WHO_AM_I_OK = {0x68: "MPU-6050", 0x70: "MPU-6500", 0x71: "MPU-9250", 0x73: "MPU-9255", 0x72: "MPU-6500",
+               0x47: "ICM-42688-P"}
 
 
 class IMU:
-    """MPU-6050 family accelerometer on I2C: 0x69 with AD0 tied high (this build, because the
-    DS3231 clock uses 0x68), or 0x68."""
+    """Accelerometer + gyro on I2C: MPU-6050 family or ICM-42688-P. Address 0x69 (AD0 tied high, this build,
+    because the DS3231 clock uses 0x68) or 0x68. The ICM-42688-P is the better gyro (about 5 to 10 times
+    quieter); the MPU-6050 still works for steps and a rougher inertial heading."""
 
     def __init__(self, bus, addresses=(0x69, 0x68)):  # 0x69 first: a DS3231 clock sits on 0x68
         self.bus = bus
         self.available = False
         self.model = None
+        self.lock = threading.Lock()  # step counter and inertial filter read the same chip
+        self.accel_lsb, self.gyro_lsb = 16384.0, 131.0
         if bus is None:
             return
         for a in addresses:
@@ -37,19 +41,48 @@ class IMU:
             if who in WHO_AM_I_OK:
                 self.addr, self.model = a, WHO_AM_I_OK[who]
                 try:
-                    bus.write_byte_data(a, 0x6B, 0x01)  # wake up, gyro X clock
-                    bus.write_byte_data(a, 0x1C, 0x00)  # accel +-2 g
-                    bus.write_byte_data(a, 0x1A, 0x03)  # digital low-pass ~44 Hz
+                    if who == 0x47:
+                        bus.write_byte_data(a, 0x76, 0x00)  # register bank 0
+                        bus.write_byte_data(a, 0x11, 0x01)  # soft reset
+                        time.sleep(0.01)
+                        bus.write_byte_data(a, 0x4E, 0x0F)  # accel + gyro on, low-noise mode
+                        time.sleep(0.01)
+                        bus.write_byte_data(a, 0x4F, (1 << 5) | 0x07)  # gyro +-1000 dps, 200 Hz
+                        bus.write_byte_data(a, 0x50, (2 << 5) | 0x07)  # accel +-4 g, 200 Hz
+                        self.accel_lsb, self.gyro_lsb = 8192.0, 32.8
+                    else:
+                        bus.write_byte_data(a, 0x6B, 0x01)  # wake up, gyro X clock
+                        bus.write_byte_data(a, 0x1C, 0x00)  # accel +-2 g
+                        bus.write_byte_data(a, 0x1B, 0x10)  # gyro +-1000 dps
+                        bus.write_byte_data(a, 0x1A, 0x03)  # digital low-pass ~44 Hz
+                        self.gyro_lsb = 32.8
                     self.available = True
                 except OSError:
                     pass
                 break
 
+    @staticmethod
+    def _s16(d, i):
+        v = d[i] << 8 | d[i + 1]
+        return v - 65536 if v > 32767 else v
+
     def accel(self):
         """(ax, ay, az) in g."""
-        d = self.bus.read_i2c_block_data(self.addr, 0x3B, 6)
-        v = [(d[i] << 8 | d[i + 1]) for i in (0, 2, 4)]
-        return tuple((x - 65536 if x > 32767 else x) / 16384.0 for x in v)
+        with self.lock:
+            d = self.bus.read_i2c_block_data(self.addr, 0x1F if self.model == "ICM-42688-P" else 0x3B, 6)
+        return tuple(self._s16(d, i) / self.accel_lsb for i in (0, 2, 4))
+
+    def read6(self):
+        """((ax, ay, az) in g, (gx, gy, gz) in deg/s), read in one burst."""
+        with self.lock:
+            if self.model == "ICM-42688-P":
+                d = self.bus.read_i2c_block_data(self.addr, 0x1F, 12)
+                a, g = d[0:6], d[6:12]
+            else:
+                d = self.bus.read_i2c_block_data(self.addr, 0x3B, 14)  # accel, temperature, gyro
+                a, g = d[0:6], d[8:14]
+        return (tuple(self._s16(a, i) / self.accel_lsb for i in (0, 2, 4)),
+                tuple(self._s16(g, i) / self.gyro_lsb for i in (0, 2, 4)))
 
 
 class StepDetector:
@@ -77,6 +110,10 @@ class StepDetector:
         return False
 
 
+def wrap180(d):
+    return (d + 180.0) % 360.0 - 180.0
+
+
 def move(lat, lon, dist_m, bearing_deg):
     """Point `dist_m` metres from (lat, lon) in direction `bearing_deg` (flat-earth, fine below ~50 km steps)."""
     b = math.radians(bearing_deg)
@@ -86,9 +123,11 @@ def move(lat, lon, dist_m, bearing_deg):
 
 
 class DeadReckoner:
-    def __init__(self, imu, get_fix, get_heading, get_manual, settings, rate_hz=50):
+    def __init__(self, imu, get_fix, get_heading, get_manual, settings, rate_hz=50, ins=None):
         """get_fix() -> GPS fix dict; get_heading() -> degrees or None;
-        get_manual() -> {"lat","lon","set"} or None; settings: (get, set) callables."""
+        get_manual() -> {"lat","lon","set"} or None; settings: (get, set) callables.
+        ins: optional ins.INS: vets GPS fixes (a spoofed fix is not used) and tracks turns without GPS."""
+        self.ins = ins
         self.imu = imu
         self.get_fix, self.get_heading, self.get_manual = get_fix, get_heading, get_manual
         self._get, self._set = settings
@@ -100,6 +139,7 @@ class DeadReckoner:
         self.pos = None         # current estimate (lat, lon)
         self.dist = 0.0         # metres moved since the anchor
         self.last_good = None   # last good GPS fix: (t, lat, lon, speed m/s, course)
+        self.ref_heading = None  # inertial heading when last_good was taken: later turns rotate the course
         self._cal = None        # step-length learning: (steps at start, lat, lon)
         self.last_t = time.time()
         self.track = []
@@ -114,7 +154,11 @@ class DeadReckoner:
             raise ValueError("mode must be foot, boat or off")
         self._set("dr_mode", mode)
         if mode == "boat":
-            self._set("dr_boat", {"speed_kn": speed_kn, "course": course} if speed_kn is not None else None)
+            self._set("dr_boat", {"speed_kn": speed_kn, "course": course, "ref_heading": self._ins_heading(),
+                                  "set": time.time()} if speed_kn is not None else None)
+
+    def _ins_heading(self):
+        return self.ins.heading() if self.ins is not None else None
 
     # --- main loop ------------------------------------------------------
     def start(self):
@@ -140,7 +184,7 @@ class DeadReckoner:
 
     def _fix_ok(self, f):
         return f.get("mode", 0) >= 2 and f.get("lat") is not None and not f.get("stale") and \
-            (f.get("hdop") is None or f["hdop"] < 5)
+            (f.get("hdop") is None or f["hdop"] < 5) and (self.ins is None or self.ins.gps_trusted(f))
 
     def tick(self, t=None):
         """Once a second: follow GPS while it has a fix, otherwise extrapolate at sea."""
@@ -151,6 +195,7 @@ class DeadReckoner:
         with self.lock:
             if self._fix_ok(f):
                 self.last_good = (t, f["lat"], f["lon"], f.get("speed") or 0.0, f.get("track"))
+                self.ref_heading = self._ins_heading()
                 self.anchor = {"lat": f["lat"], "lon": f["lon"], "t": t, "source": "gps"}
                 self.pos, self.dist = (f["lat"], f["lon"]), 0.0
                 self._learn_step(f)
@@ -164,12 +209,16 @@ class DeadReckoner:
             if self.pos is None or self.mode != "boat" or dt <= 0 or dt > 30:
                 return
             boat = self._get("dr_boat") or {}
+            ref = None
             if boat.get("speed_kn") is not None:
-                speed, course = boat["speed_kn"] * 0.514444, boat.get("course")
+                speed, course, ref = boat["speed_kn"] * 0.514444, boat.get("course"), boat.get("ref_heading")
             elif self.last_good:
-                speed, course = self.last_good[3], self.last_good[4]
+                speed, course, ref = self.last_good[3], self.last_good[4], self.ref_heading
             else:
                 return
+            now_h = self._ins_heading()
+            if course is not None and ref is not None and now_h is not None:
+                course = (course + wrap180(now_h - ref)) % 360.0  # the gyro felt every turn since then
             if course is None:
                 course = self.get_heading()
             if course is None or speed < 0.05:
