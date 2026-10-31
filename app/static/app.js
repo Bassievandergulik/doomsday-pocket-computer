@@ -58,7 +58,7 @@ function show(p) {
   if (p === "radio") { radioRefresh(); swRefresh(); airRefresh(); }
   if (p === "wx") { loadWeather(); loadForecast(); }
   if (p === "info" && !$("#lib-index").innerHTML) loadLibraryIndex();
-  if (p === "share") hotspotRefresh();
+  if (p === "share") { hotspotRefresh(); meshRefresh(); }
 }
 document.querySelectorAll("#tabs button[data-p]").forEach(b => b.onclick = () => show(b.dataset.p));
 $("#night").onclick = () => { document.body.classList.toggle("night"); save("night", document.body.classList.contains("night")); };
@@ -525,6 +525,32 @@ $("#lt-red").onclick = () => lightDo({ which: "red", on: !S.light.red.on });
 $("#lt-wb").onchange = (e) => lightDo({ which: "white", brightness: +e.target.value });
 $("#lt-rb").onchange = (e) => lightDo({ which: "red", brightness: +e.target.value });
 $("#lt-sos").onclick = () => lightDo({ sos: !S.light.sos });
+// ---------------------------------------------------------------- Meshtastic messages
+async function meshRefresh() {
+  let d; try { d = await api("/api/mesh"); } catch (e) { return; }
+  $("#mesh-off").classList.toggle("hidden", d.available);
+  $("#mesh-on").classList.toggle("hidden", !d.available);
+  $("#mesh-off").innerHTML = "<b>No message radio.</b> " + esc(d.error || "") +
+    "<br>Plug a Meshtastic node (Heltec or LilyGO LoRa board) into the USB hub.";
+  if (!d.available) return;
+  $("#mesh-msgs").innerHTML = d.messages.slice().reverse().map(m => `<div class="item"><div class="grow">
+    <div class="name">${m.out ? "Me" : esc(m.from)}</div><div>${esc(m.text)}</div>
+    <div class="small">${new Date(m.t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}${m.snr != null ? " · SNR " + m.snr : ""}</div></div></div>`).join("")
+    || '<div class="small">No messages yet.</div>';
+  $("#mesh-nodes").textContent = d.nodes.length ? d.nodes.length + " nodes nearby: " +
+    d.nodes.map(n => n.name).join(", ") : "No other nodes heard yet.";
+}
+async function meshDo(body) {
+  const r = await api("/api/mesh", body);
+  if (r.error) toast(r.error); meshRefresh();
+}
+$("#mesh-send").onclick = async () => {
+  const t = await askText("Message (sent to all nodes nearby)", "");
+  if (t === null || !t.trim()) return;
+  meshDo({ action: "send", text: t });
+};
+$("#mesh-pos").onclick = () => meshDo({ action: "position" });
+setInterval(() => { if (S.page === "share") meshRefresh(); }, 5000);
 $("#wx-sw").onclick = () => { show("radio"); setTimeout(() => $("#sw-head").scrollIntoView(), 50); };
 $("#sw-regions").onclick = (e) => { if (e.target.dataset.r2) { SW.region = e.target.dataset.r2; swRefresh(); } };
 $("#sw-stations").onclick = (e) => { if (e.target.dataset.s) { SW.station = e.target.dataset.s; save("sw_station", SW.station); swRefresh(); } };

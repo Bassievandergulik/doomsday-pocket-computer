@@ -134,6 +134,10 @@ The installer downloads the Si4732 SSB patch once (`tools/get_ssb_patch.py`; it 
 
 **No GPS fix: dead reckoning** (`app/deadreck.py`). An MPU-6050 accelerometer (GY-521; MPU-6500/9250 clones accepted, at 0x69 with AD0 high because the DS3231 clock uses 0x68) counts steps; each step moves the estimate one step length (learned from GPS) along the compass heading. In Boat mode the estimate continues with the last GPS speed and course, or a speed and course typed in. It restarts from every GPS fix and from coordinates you type (Go tab, "Enter coordinates": decimal, degrees + decimal minutes, DMS or UTM) or set on the map ("I am here"). The map shows it as an orange dot with an error circle (on foot 10 m + 5% of distance; boat 50 m + 10% + drift). Estimated points are added to the track.
 
+**Messages (Meshtastic):** plug a Meshtastic node (Heltec or LilyGO LoRa board) into the USB hub. The ⇄ tab's "Messages" section lists messages and nearby nodes, sends short text (on-screen keyboard), and shares your position. Needs `pip install meshtastic`. Untested with real nodes.
+
+**Other boards:** the Pi is the default. See [docs/boards.md](docs/boards.md) for what a Radxa Zero 3W would need. Not tested.
+
 **Clock:** a DS3231 clock chip keeps time while off (`dtoverlay=i2c-rtc,ds3231`); GPS time and a computer on the hotspot correct it, or tap the clock on screen.
 
 ## Configuration

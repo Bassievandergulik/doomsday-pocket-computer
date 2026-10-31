@@ -421,6 +421,33 @@ def m_cos(deg):
     return math.cos(math.radians(deg))
 
 
+class MeshTest(unittest.TestCase):
+    def test_messages_and_limits(self):
+        import mesh
+        m = mesh.Mesh("auto", get_position=lambda: (52.37, 4.89))
+        m.available = True  # pretend the meshtastic package is installed
+        class Node:
+            localNode = type("L", (), {"sendPosition": lambda self, la, lo: None})()
+            nodes = {"!a1": {"user": {"longName": "Hut 2"}, "snr": 5, "lastHeard": 1}}
+            sent = []
+            def sendText(self, t): self.sent.append(t)
+        m.iface = Node()
+        m._on_text({"fromId": "!b2", "decoded": {"text": "water at the creek"}, "rxSnr": 3.5})
+        m.send_text("on my way")
+        self.assertEqual([x["text"] for x in m.status()["messages"]], ["water at the creek", "on my way"])
+        self.assertEqual(m.status()["nodes"][0]["name"], "Hut 2")
+        m.share_position()
+        self.assertIn("My position: 52.37000, 4.89000", m.iface.sent)
+        with self.assertRaises(ValueError):
+            m.send_text("x" * 300)
+        with self.assertRaises(ValueError):
+            m.send_text("   ")
+        m2 = mesh.Mesh("auto")
+        self.assertFalse(m2.status()["available"])
+        with self.assertRaises(RuntimeError):
+            m2.send_text("hi")  # no node connected
+
+
 class FakeRdaBus:
     """Pretends to be an RDA5807M: 16-bit registers, tune/seek complete at once."""
 

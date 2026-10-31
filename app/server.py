@@ -36,6 +36,7 @@ import shortwave as shortwave_mod  # noqa: E402
 import deadreck  # noqa: E402
 import airband as airband_mod  # noqa: E402
 import light as light_mod  # noqa: E402
+import mesh as mesh_mod  # noqa: E402
 from kiwix import Kiwix  # noqa: E402
 from search import Finder, LANGS, LANG_NAMES  # noqa: E402
 
@@ -57,6 +58,8 @@ DEFAULT_CONFIG = {
     "sw_capture_volume": 45,            # radio volume (0-63) while recording a fax / RTTY
     "sw_keep_audio": False,
     "airband_gain": 40,
+    "meshtastic_port": "auto",          # USB serial port of a Meshtastic node, or "auto"
+    "board": "pi",                      # "pi" (Pi Zero 2 W / 3 A+); see docs/boards.md for alternatives
     "light_white_gpio": 12,             # MOSFET gate of the 1 W white LED (PWM pin)
     "light_red_gpio": 13,               # MOSFET gate of the red LED (PWM pin)                 # RTL-SDR tuner gain in dB for the airband receiver             # keep the WAV recordings (about 1 MB per minute)
     "i2c_bus": 1,
@@ -151,6 +154,8 @@ class App:
                                         lambda: self.get_setting("manual_pos"), (self.get_setting, self.set_setting))
         self.dr.start()
         threading.Thread(target=self._clock_from_gps, daemon=True).start()
+        self.mesh = mesh_mod.Mesh(self.config["meshtastic_port"], get_position=self.position)
+        self.mesh.start()
         self.light = light_mod.Light(self.config["light_white_gpio"], self.config["light_red_gpio"])
         self.airband = airband_mod.Airband(self.get_setting, self.set_setting, self.config["audio_device"],
                                            self.config["airband_gain"])
@@ -571,7 +576,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._static("index.html" if p == "/" else p[len("/static/"):])
             if p.startswith("/vt/"):
                 z, x, y = (int(v) for v in p[4:].split("/"))
-                return self._send(200, app.vector_tile(z, x, y), cache="max-age=86400")
+                data = app.vector_tile(z, x, y)
+                # revalidate every time (cheap on the device), and never keep an empty tile:
+                # a tile fetched before nav.db existed would otherwise stay blank in the browser
+                empty = not any(data.get(k) for k in ("lines", "areas", "places", "pois"))
+                return self._send(200, data, cache="no-store" if empty else "no-cache")
             if p.startswith("/tiles/"):
                 return self._raster(p)
             if p == "/api/status":
@@ -641,6 +650,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, app.airband.status())
             if p == "/api/light":
                 return self._send(200, app.light.status())
+            if p == "/api/mesh":
+                return self._send(200, app.mesh.status())
             if p == "/api/sw":
                 return self._send(200, app.shortwave.status())
             if p.startswith("/sw/"):
@@ -723,6 +734,16 @@ class Handler(BaseHTTPRequestHandler):
                 except RuntimeError as e:
                     return self._send(200, dict(app.airband.status(), error=str(e)))
                 return self._send(200, app.airband.status())
+            if p == "/api/mesh":
+                act = b.get("action")
+                try:
+                    if act == "send":
+                        app.mesh.send_text(b.get("text"))
+                    elif act == "position":
+                        app.mesh.share_position()
+                except (ValueError, RuntimeError) as e:
+                    return self._send(200, dict(app.mesh.status(), error=str(e)))
+                return self._send(200, app.mesh.status())
             if p == "/api/light":
                 if "sos" in b:
                     return self._send(200, app.light.set_sos(b["sos"]))
@@ -850,7 +871,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, "", "text/plain")
         data = row[0]
         ctype = "image/png" if data[:4] == b"\x89PNG" else "image/jpeg" if data[:2] == b"\xff\xd8" else "image/webp"
-        return self._send(200, data, ctype, cache="max-age=604800")
+        return self._send(200, data, ctype, cache="no-cache")
 
 
 def _dms(lat, lon):

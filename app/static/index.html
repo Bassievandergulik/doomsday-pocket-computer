@@ -145,6 +145,13 @@
 
   <!-- SHARE: direct WiFi to a computer -->
   <section id="p-share" class="page">
+    <h3>Messages (Meshtastic)</h3>
+    <div class="card small" id="mesh-off"></div>
+    <div id="mesh-on">
+      <div id="mesh-msgs" class="list" style="max-height:110px;overflow-y:auto"></div>
+      <div class="row"><button id="mesh-send">Send a message</button><button id="mesh-pos">Share my position</button></div>
+      <div id="mesh-nodes" class="small"></div>
+    </div>
     <div class="card">
       <div class="big">Connect your computer</div>
       <div class="small">Turns this device into a WiFi hotspot. Join it from your computer, then open the address below to upload maps and download your waypoints, track and weather log. It switches itself off after an hour unused.</div>
