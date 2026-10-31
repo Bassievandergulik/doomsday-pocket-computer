@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Survival Computer Files</title>
+<style>
+  :root { --bg: #f4f2ee; --fg: #1d2227; --mut: #66707a; --card: #fff; --line: #ddd8cf; --acc: #c77d00; --bad: #c0392b; --ok: #2e7d32; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #111417; --fg: #e8e6e1; --mut: #8d949b; --card: #1d2227; --line: #2c333a; --acc: #f0a020; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 22px; margin: 6px 0 2px; }
+  h2 { font-size: 16px; margin: 22px 0 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 8px 0; }
+  .mut { color: var(--mut); font-size: 13px; }
+  a.btn, button, label.btn { display: inline-block; background: var(--acc); color: #000; border: 0; border-radius: 8px;
+    padding: 8px 14px; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; margin: 3px 4px 3px 0; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td.r { text-align: right; white-space: nowrap; }
+  #drop { border: 2px dashed var(--line); border-radius: 10px; padding: 22px; text-align: center; }
+  #drop.over { border-color: var(--acc); }
+  .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; margin-top: 6px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--acc); }
+  .err { color: var(--bad); } .ok { color: var(--ok); }
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Pocket survival computer: files</h1>
+  <div class="mut">You are connected over the device's own WiFi. <a href="/">Open the device app here</a> to use the map, guide and data on this computer.</div>
+
+  <h2>Upload to the device</h2>
+  <div class="card">
+    <div id="drop">Drop files here, or <label class="btn" for="pick">Choose files</label><input id="pick" type="file" multiple></div>
+    <div class="mut" style="margin-top:8px">
+      <b>nav.db</b>: map database from <code>tools/build_navdb.py</code> ·
+      <b>map.mbtiles</b>: satellite imagery from <code>tools/build_imagery.py</code> ·
+      <b>.gpx</b>: waypoints/routes planned on the computer (added to your waypoints) ·
+      <b>.md</b>: your own guide pages (Guide → My pages).
+      Big files take a while: about 1–3 MB/s over the device's WiFi. Keep this page open until it says done.
+    </div>
+    <div id="uploads"></div>
+  </div>
+
+  <h2>Download from the device</h2>
+  <div class="card">
+    <a class="btn" href="/api/export/waypoints.gpx">Waypoints (GPX)</a>
+    <a class="btn" href="/api/export/track.gpx">Walked track (GPX)</a>
+    <a class="btn" href="/api/export/weather.csv">Weather log (CSV)</a>
+    <a class="btn" href="/api/export/weather-charts.zip">Received weather charts and texts (ZIP)</a>
+    <a class="btn" href="/api/export/backup.db">Full backup of your data</a>
+    <div class="mut" style="margin-top:6px">GPX opens in most map programs (OsmAnd, QGIS, Garmin BaseCamp, gpx.studio). The backup holds waypoints, radio presets, settings and the weather log.</div>
+  </div>
+
+  <h2>On the device</h2>
+  <div class="card"><table id="files"></table><div id="space" class="mut"></div></div>
+</main>
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const mb = (b) => b >= 1e9 ? (b / 1e9).toFixed(2) + " GB" : (b / 1e6).toFixed(1) + " MB";
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+async function refresh() {
+  const r = await fetch("/api/files").then(r => r.json());
+  $("#files").innerHTML = r.files.map(f => `<tr><td>${esc(f.label)}<div class="mut">${esc(f.path)}</div></td>
+    <td class="r">${f.exists ? mb(f.size) + "<div class='mut'>" + new Date(f.modified * 1000).toLocaleString() + "</div>" : "<span class='mut'>not installed</span>"}</td></tr>`).join("") +
+    `<tr><td>Waypoints</td><td class="r">${r.waypoints}</td></tr><tr><td>Track points</td><td class="r">${r.track_points}</td></tr>` +
+    `<tr><td>My guide pages</td><td class="r">${r.my_pages.length ? r.my_pages.map(esc).join("<br>") : "<span class='mut'>none</span>"}</td></tr>`;
+  $("#space").textContent = `Free space on the SD card: ${mb(r.free_bytes)} of ${mb(r.total_bytes)}`;
+}
+
+function upload(file) {
+  const row = document.createElement("div");
+  row.className = "card";
+  row.innerHTML = `<b>${esc(file.name)}</b> <span class="mut">${mb(file.size)}</span> <span class="st mut">uploading...</span><div class="bar"><i></i></div>`;
+  $("#uploads").prepend(row);
+  const xhr = new XMLHttpRequest();
+  xhr.open("PUT", "/api/upload?name=" + encodeURIComponent(file.name));
+  xhr.upload.onprogress = (e) => { if (e.lengthComputable) row.querySelector("i").style.width = (e.loaded / e.total * 100) + "%"; };
+  xhr.onload = () => {
+    let r = {};
+    try { r = JSON.parse(xhr.responseText); } catch (e) { r = { error: xhr.responseText }; }
+    const st = row.querySelector(".st");
+    if (xhr.status === 200) {
+      st.className = "st ok";
+      st.textContent = r.waypoints_added != null ? `done: ${r.waypoints_added} waypoints added` : "done";
+    } else { st.className = "st err"; st.textContent = r.error || ("failed (" + xhr.status + ")"); }
+    refresh();
+  };
+  xhr.onerror = () => { row.querySelector(".st").className = "st err"; row.querySelector(".st").textContent = "connection lost: try again"; };
+  xhr.send(file);
+}
+$("#pick").onchange = (e) => { [...e.target.files].forEach(upload); e.target.value = ""; };
+const drop = $("#drop");
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); [...e.dataTransfer.files].forEach(upload); };
+refresh();
+// the device has no clock battery: give it this computer's time
+fetch("/api/clock", { method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ epoch: Date.now() / 1000 }) }).catch(() => {});
+</script>
+</body>
+</html>

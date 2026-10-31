@@ -1,0 +1,28 @@
+# Runtime data and large offline content (copy to the SD card, never commit)
+data/
+*.zim
+*.mbtiles
+*.osm.pbf
+nav.db
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+# Si4732 SSB patch: personal-use licence, downloaded by the installer
+*ssb_patch*
+# Videos and recordings
+*.mp4
+*.webm
+*.wav
+# Python / editors / OS
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Pocket Survival</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="status"><span id="st-gps">GPS --</span><span id="st-pos"></span><span id="st-clock"></span><span id="st-bat"></span></div>
+
+<main>
+  <!-- MAP -->
+  <section id="p-map" class="page active">
+    <canvas id="map"></canvas>
+    <div class="map-btns">
+      <button id="zin">+</button><button id="zout">&minus;</button>
+      <button id="follow" title="Follow GPS">&#9678;</button>
+      <button id="layer" title="Toggle raster map">&#9638;</button>
+    </div>
+    <div id="map-info"></div>
+    <div id="map-attr">&copy; OpenStreetMap</div>
+    <div id="map-menu" class="sheet hidden">
+      <div id="mm-title"></div>
+      <button data-act="wp">Save waypoint</button>
+      <button data-act="go">Navigate here</button>
+      <button data-act="near">What's near here</button>
+      <button data-act="here">I am here</button>
+      <button data-act="close" style="grid-column: 1 / -1">Close</button>
+    </div>
+  </section>
+
+  <!-- GO / NAVIGATE -->
+  <section id="p-go" class="page">
+    <div class="go-wrap">
+      <canvas id="compass" width="240" height="240"></canvas>
+      <div class="go-side">
+        <div id="go-target" class="big">No target</div>
+        <div id="go-dist" class="huge">--</div>
+        <div id="go-brg">Bearing --</div>
+        <div id="go-eta"></div>
+        <div id="go-head" class="small"></div>
+        <div class="row">
+          <button id="wp-here">Mark here</button>
+          <button id="go-clear">Clear target</button>
+        </div>
+      </div>
+    </div>
+    <div id="go-pos" class="card small"></div>
+    <div class="card small" id="dr-card">
+      <div id="dr-info"></div>
+      <div class="row"><button id="dr-enter">Enter coordinates</button></div>
+      <div class="row"><span>Without GPS</span><div id="dr-mode" class="chips" style="flex:1;margin:0">
+        <button data-m="foot">On foot</button><button data-m="boat">Boat</button><button data-m="off">Off</button></div></div>
+      <div class="row hidden" id="dr-boat-row"><button id="dr-boat">Boat speed and course...</button></div>
+    </div>
+    <h3>Waypoints</h3>
+    <div id="wp-list" class="list"></div>
+    <div class="row"><button id="cal-start">Calibrate compass</button></div>
+  </section>
+
+  <!-- FIND -->
+  <section id="p-find" class="page">
+    <div class="row"><input id="find-q" placeholder="Search town, place, waypoint..."><button id="find-go">Search</button></div>
+    <div id="cats" class="chips"></div>
+    <div id="find-list" class="list"></div>
+  </section>
+
+  <!-- RADIO -->
+  <section id="p-radio" class="page">
+    <div id="radio-off" class="card hidden"></div>
+    <div id="radio-on">
+      <div class="radio-top">
+        <div><div id="r-freq" class="huge">--</div><div id="r-rds" class="big"></div></div>
+        <div class="meter"><div>Signal <span id="r-rssi"></span></div><div class="bar"><i id="r-bar"></i></div><div id="r-snr" class="small"></div></div>
+      </div>
+      <div id="r-bands" class="chips"></div>
+      <div id="r-busy" class="warn hidden"></div>
+      <div class="row radio-ctl">
+        <button data-r="seek" data-dir="-1">&#9664;&#9664;</button>
+        <button data-r="step" data-dir="-1">&#9664;</button>
+        <button data-r="step" data-dir="1">&#9654;</button>
+        <button data-r="seek" data-dir="1">&#9654;&#9654;</button>
+      </div>
+      <div id="r-fine" class="row hidden"><span class="small">Fine</span>
+        <button data-bfo="-100">&minus;100 Hz</button><button data-bfo="0">0</button><button data-bfo="100">+100 Hz</button></div>
+      <div class="row"><span>Vol</span><input id="r-vol" type="range" min="0" max="63"><button id="r-mute">Mute</button></div>
+      <div class="row"><button id="r-save">Save preset</button><button id="r-scan">Scan band</button></div>
+      <div id="r-presets" class="list"></div>
+    </div>
+    <h3 id="air-head">Airband (aircraft, VHF)</h3>
+    <div id="air-off" class="card small hidden"></div>
+    <div id="air-on">
+      <div id="air-now" class="card hidden"></div>
+      <div id="air-freqs" class="chips"></div>
+      <div class="row"><span class="small">Squelch</span><div id="air-sq" class="chips" style="flex:1;margin:0"></div></div>
+      <div class="row"><button id="air-listen">Listen</button><button id="air-scan">Scan all</button><button id="air-add">Add...</button></div>
+    </div>
+    <h3 id="sw-head">Weather by shortwave</h3>
+    <div id="sw-off" class="card small hidden"></div>
+    <div id="sw-on">
+      <div id="sw-job" class="card hidden"></div>
+      <div id="sw-form">
+        <div id="sw-regions" class="chips"></div>
+        <div id="sw-stations" class="chips"></div>
+        <div class="row"><span class="small">Minutes</span><div id="sw-min" class="chips" style="flex:1;margin:0"></div></div>
+        <div class="row"><button id="sw-go">Receive now</button><button id="sw-add">Every day at...</button></div>
+      </div>
+      <div id="sw-sched" class="list"></div>
+      <div id="sw-last" class="small"></div>
+      <div id="sw-results" class="list"></div>
+    </div>
+  </section>
+
+  <!-- WEATHER -->
+  <section id="p-wx" class="page">
+    <div id="wx-now" class="wx-grid"></div>
+    <div id="wx-fc" class="card big"></div>
+    <div id="wx-warn"></div>
+    <canvas id="wx-chart" height="110"></canvas>
+    <div class="small">Barometric forecast for the next ~12 hours at this spot. Pressure falling fast = bad weather coming.</div>
+    <div class="row"><button id="wx-sw">Weather charts by shortwave radio (no internet) &rsaquo;</button></div>
+    <h3 id="fc-head">Downloaded forecast</h3>
+    <div class="row" id="fc-row"><span id="fc-age" class="small" style="flex:1"></span><button id="fc-update" style="flex:0 0 auto">Update now</button></div>
+    <div id="fc-warn"></div>
+    <div id="fc-days" class="fc-days"></div>
+    <div id="fc-grid-title" class="small"></div>
+    <canvas id="fc-grid" height="250"></canvas>
+    <div id="fc-hours"></div>
+  </section>
+
+  <!-- SEARCH: everything on the device, in any language -->
+  <section id="p-search" class="page">
+    <div id="s-main">
+      <div class="row"><input id="s-q" placeholder="Search everything, any language..."><button id="s-go">Search</button></div>
+      <div id="s-info" class="small">Searches the survival guide, Wikipedia and other offline libraries, videos and the map at once. Type in English, Dutch, Spanish, German, French, Portuguese, Italian, Polish, Ukrainian, Russian, Arabic or Turkish; accents and small typos don't matter.</div>
+      <div id="s-results"></div>
+    </div>
+    <div id="s-reader" class="hidden">
+      <div class="row"><button id="s-back">&larr; Results</button><span id="s-rtitle" class="small grow"></span><button id="s-smaller">A&minus;</button><button id="s-bigger">A+</button></div>
+      <iframe id="s-frame" title="Article"></iframe>
+      <video id="s-video" class="hidden" controls preload="metadata"></video>
+    </div>
+  </section>
+
+  <!-- SHARE: direct WiFi to a computer -->
+  <section id="p-share" class="page">
+    <div class="card">
+      <div class="big">Connect your computer</div>
+      <div class="small">Turns this device into a WiFi hotspot. Join it from your computer, then open the address below to upload maps and download your waypoints, track and weather log. It switches itself off after an hour unused.</div>
+    </div>
+    <div class="row"><button id="hs-toggle">Turn on</button></div>
+    <div id="hs-info" class="card"></div>
+    <div class="row"><button id="hs-newpass">New password</button></div>
+  </section>
+
+  <!-- INFO / LIBRARY -->
+  <section id="p-info" class="page">
+    <div class="row"><input id="lib-q" placeholder="Search survival guide..."><button id="lib-go">Search</button></div>
+    <div id="lib-index"></div>
+    <div id="lib-page" class="hidden">
+      <div class="row"><button id="lib-back">&larr; Back</button><button id="lib-smaller">A&minus;</button><button id="lib-bigger">A+</button></div>
+      <article id="lib-body"></article>
+    </div>
+  </section>
+</main>
+
+<nav id="tabs">
+  <button data-p="search" class="icon" title="Search everything"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="10" cy="10" r="6.5"/><path d="M15 15l6 6"/></svg></button>
+  <button data-p="map" class="active">Map</button>
+  <button data-p="go">Go</button>
+  <button data-p="find">Find</button>
+  <button data-p="radio">Radio</button>
+  <button data-p="wx">Weather</button>
+  <button data-p="info">Guide</button>
+  <button data-p="share" class="icon" title="Connect a computer">&#8644;</button>
+  <button id="torch" class="icon" title="Torch">&#128294;</button>
+  <button id="night" class="icon" title="Red night mode">&#9790;</button>
+</nav>
+<div id="light-sheet" class="confirm-sheet hidden"><div class="confirm-box">
+  <div id="light-msg" class="small"></div>
+  <div class="row"><button id="lt-white" class="lt-big">Torch</button><button id="lt-red" class="lt-big">Red light</button></div>
+  <div class="row"><span class="small">White</span><input id="lt-wb" type="range" min="5" max="100"></div>
+  <div class="row"><span class="small">Red</span><input id="lt-rb" type="range" min="5" max="100"></div>
+  <div class="row"><button id="lt-sos" class="danger">SOS signal</button><button id="lt-close">Close</button></div>
+</div></div>
+<div id="viewer" class="hidden"><div class="v-bar"><span id="v-title" class="small"></span>
+  <button id="v-zoom">Zoom</button><button id="v-del">Delete</button><button id="v-close">Close</button></div>
+  <div id="v-body"></div></div>
+<div id="toast" class="hidden"></div>
+<script src="/static/keyboard.js"></script>
+<script src="/static/map.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

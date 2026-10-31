@@ -1,0 +1,26 @@
+# Fractures, sprains and head injury
+
+## Signs of a broken bone
+Pain at a point, swelling, bruising, deformity or unusual angle, unable to use it, grating feeling, shortened limb.
+
+## Treatment
+1. **Don't straighten** a deformed limb unless there is no pulse beyond it and help is many hours away. Then one gentle steady pull in the line of the limb is acceptable.
+2. **Support it** in the position found. Pad with clothing.
+3. **Splint**: rigid item (stick, rolled magazine, walking pole) longer than the bone, covering the joint above and below. Tie it on in at least 2 places, knots on the splint side, not over the break.
+   - Forearm/wrist: splint + **sling**. Lower leg: splint, or tie to the good leg with padding between.
+   - Fingers: tape to the neighbouring finger.
+4. Check circulation every 15 min (colour, warmth, feeling beyond the splint). Loosen if numb or blue.
+5. **Open fracture** (bone through skin): cover with a clean dressing, control bleeding around it, don't push the bone back.
+6. Treat for [Shock](page:firstaid/shock), keep warm, raise the injured limb if possible.
+
+## Sprains and strains: PRICE
+**P**rotect, **R**est, **I**ce (cold pack wrapped in cloth, 15–20 min every 2–3 h), **C**ompression bandage (not too tight), **E**levate. Gentle movement after 48 h. Can't take any weight or there's a bony tender spot: treat as a fracture.
+
+## Spine injury
+Suspect after falls from height, diving, car crash, or neck/back pain with tingling, numbness or weakness. Keep head and neck still in line with the body, hold the head with both hands. Only move them for danger or to keep the airway open (log-roll with several people).
+
+## Head injury: danger signs
+Get them to help urgently if: unconscious even briefly, confused, repeated vomiting, worsening headache, unequal pupils, clear fluid from nose/ears, seizure, weakness on one side, drowsy and hard to wake. Watch anyone with a head bump for 24 hours and wake them every few hours.
+
+## Dislocated shoulder / kneecap
+Support in the most comfortable position and splint/sling. Only attempt to put it back if you are trained or help is days away.
