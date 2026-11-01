@@ -1,5 +1,5 @@
 // Pocket INS: the phone's sensors feed the INS core (core/ins.js). Everything runs on the phone, offline.
-import { INS, DeadReckoner, haversine, bearing, wrap180 } from "./core/ins.js";
+import { INS, DeadReckoner, haversine, bearing, wrap180, TRAVEL, VEHICLES } from "./core/ins.js";
 import { parseCoords, formatDM } from "./core/coords.js";
 import { startDemo } from "./demo.js";
 
@@ -30,10 +30,13 @@ const getFix = () => {
   return now() - S.fixAt > 6 ? { ...S.fix, stale: true } : S.fix;
 };
 
+const mode = () => (TRAVEL[store.get("dr_mode")] ? store.get("dr_mode") : "foot");
 const ins = new INS({
   model: "phone",
-  getSea: () => !!store.get("sea"),
-  getSteps: () => dr.steps.count,
+  getAlign: () => TRAVEL[mode()].align,
+  courseRef: () => mode() === "foot",          // in a vehicle the phone may sit in any mount: use only its turns
+  getSteps: () => (TRAVEL[mode()].steps ? dr.steps.count : null),
+  maxSpeed: TRAVEL[mode()].maxSpeed,
   getRef: () => { const e = dr.estimate(); return e ? [e.lat, e.lon, e.err_m] : null; },
   spoofAction: store.get("action") || "switch",
 });
@@ -65,7 +68,7 @@ function onMotion(e) {
   ax *= sg; ay *= sg; az *= sg;
   // phone axes: x right, y top, z out of the screen. INS axes: x top, y left, z out of the screen.
   const acc = [ay, -ax, az];
-  if (dr.steps.feed(t, ax, ay, az)) dr.onStep();
+  if (dr.steps.feed(t, ax, ay, az) && TRAVEL[mode()].steps) dr.onStep();
   if (!r || r.alpha == null) { S.gyro = false; return; }
   S.gyro = true;
   ins.feed(t, acc, [r.gamma, -r.beta, r.alpha]);
@@ -87,9 +90,18 @@ function onOrientation(e, absolute) {
 }
 
 function onPosition(p) {
-  const c = p.coords;
-  const speed = c.speed != null && !Number.isNaN(c.speed) ? c.speed : null;
-  const track = c.heading != null && !Number.isNaN(c.heading) && (speed ?? 0) > 0.3 ? c.heading : null;
+  const c = p.coords, t = p.timestamp / 1000;
+  let speed = c.speed != null && !Number.isNaN(c.speed) && c.speed >= 0 ? c.speed : null;
+  let track = c.heading != null && !Number.isNaN(c.heading) && c.heading >= 0 && (speed ?? 0) > 0.3 ? c.heading : null;
+  // Some phones give no speed or course: work them out from the last few fixes instead
+  const P = S.speedRef;
+  if (P && t - P.t >= 2 && (speed == null || track == null)) {
+    const d = haversine(P.lat, P.lon, c.latitude, c.longitude);
+    if (speed == null) speed = d > Math.max(3, (c.accuracy || 10) / 2) ? d / (t - P.t) : 0;
+    if (track == null && speed > 0.5) track = bearing(P.lat, P.lon, c.latitude, c.longitude);
+  }
+  if (!P || t - P.t >= 2) S.speedRef = { lat: c.latitude, lon: c.longitude, t };
+  S.gpsErr = "";
   S.fix = { mode: 3, lat: c.latitude, lon: c.longitude, speed, track, acc: c.accuracy,
     hdop: c.accuracy != null ? c.accuracy / 5 : null, time_local: p.timestamp / 1000 };
   S.fixAt = now();
@@ -119,7 +131,9 @@ async function startSensors() {
   if ("ondeviceorientationabsolute" in window) window.addEventListener("deviceorientationabsolute", (e) => onOrientation(e, true));
   window.addEventListener("deviceorientation", (e) => onOrientation(e, false));
   if ("geolocation" in navigator) {
-    navigator.geolocation.watchPosition(onPosition, (err) => { S.gpsErr = err.message || "GPS unavailable"; },
+    navigator.geolocation.watchPosition(onPosition, (err) => {
+      S.gpsErr = err.code === 1 ? "No location access" : err.code === 3 ? "" : err.message || "GPS unavailable";
+    },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
   } else S.gpsErr = "No GPS in this browser";
   keepAwake();
@@ -139,8 +153,24 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 setInterval(() => {
   if ($("#main").classList.contains("hidden")) return;
   dr.tick();
+  odometer();
   if (dr.track.length && (!dr._saved || dr.track.length !== dr._saved)) { store.set("track", dr.track); dr._saved = dr.track.length; }
 }, 1000);
+
+// ------------------------------------------------------------------ trip distance
+// Adds up the distance between positions at least 10 m (or the GPS accuracy) apart, so GPS jitter
+// while standing still does not count. Distance by dead reckoning counts too.
+S.trip = store.get("trip") || { m: 0, since: now() };
+function odometer() {
+  const b = best();
+  if (!b) return;
+  const L = S.odoLast;
+  if (!L || L.src !== b.src) { S.odoLast = { lat: b.lat, lon: b.lon, src: b.src }; return; }
+  const d = haversine(L.lat, L.lon, b.lat, b.lon);
+  const min = b.src === "gps" ? Math.max(10, b.err || 10) : 5;
+  if (d >= min && d < 5000) { S.trip.m += d; store.set("trip", S.trip); S.odoLast = { lat: b.lat, lon: b.lon, src: b.src }; }
+  else if (d >= 5000) S.odoLast = { lat: b.lat, lon: b.lon, src: b.src };
+}
 
 // ------------------------------------------------------------------ UI
 const fmtDeg = (d) => (d == null ? "---°" : String(Math.round(d) % 360).padStart(3, "0") + "°");
@@ -180,7 +210,7 @@ function render() {
   else { ci.textContent = "INS nav"; ci.className = "chip ok"; }
   const cg = $("#chip-gps");
   if (st.gps === "suspect") { cg.textContent = "GPS suspect"; cg.className = "chip bad"; }
-  else if (f.mode < 2) { cg.textContent = S.gpsErr ? "GPS error" : "No GPS fix"; cg.className = "chip warn"; }
+  else if (f.mode < 2) { cg.textContent = S.gpsErr || "No GPS fix"; cg.className = "chip warn"; }
   else if (f.stale) { cg.textContent = "GPS lost"; cg.className = "chip warn"; }
   else if (st.gps === "trusted-by-hand") { cg.textContent = "GPS trusted"; cg.className = "chip warn"; }
   else { cg.textContent = "GPS ok"; cg.className = "chip ok"; }
@@ -190,7 +220,9 @@ function render() {
   if (st.state === "align" && S.gyro) {
     ab.classList.remove("hidden");
     $("#align-fill").style.width = st.alignPct + "%";
-    $("#align-text").textContent = st.alignSea ? `Aligning at sea ${st.alignPct}%, keep it in one place` : `Hold still, screen up: ${st.alignPct}%`;
+    $("#align-text").textContent = st.alignProfile === "sea" ? `Aligning at sea ${st.alignPct}%, keep it in one place`
+      : st.alignProfile === "vehicle" ? `Aligning ${st.alignPct}%, keep the phone in one place (driving straight is fine)`
+        : `Hold still, screen up: ${st.alignPct}%`;
   } else ab.classList.add("hidden");
 
   // heading
@@ -222,7 +254,10 @@ function render() {
     $("#pos-dec").textContent = S.gpsErr ? S.gpsErr + ". Type your position below to start dead reckoning." : "";
     $("#pos-src").textContent = "";
   }
-  $("#spd").textContent = f.mode >= 2 && !f.stale && f.speed != null ? `${(f.speed * 1.94384).toFixed(1)} kn` : "-";
+  const knots = mode() === "boat" || mode() === "plane";
+  $("#spd").textContent = f.mode >= 2 && !f.stale && f.speed != null
+    ? (knots ? `${(f.speed * 1.94384).toFixed(f.speed < 50 ? 1 : 0)} kn` : `${(f.speed * 3.6).toFixed(f.speed < 10 ? 1 : 0)} km/h`) : "-";
+  $("#trip").textContent = fmtDist(S.trip.m).replace(/ \(.*\)/, knots && S.trip.m >= 1852 ? ` (${(S.trip.m / 1852).toFixed(1)} NM)` : "");
   $("#crs").textContent = f.mode >= 2 && !f.stale && f.track != null ? fmtDeg(f.track) : "-";
   $("#steps").textContent = dr.steps.count;
 
@@ -243,26 +278,39 @@ function render() {
 }
 
 // ------------------------------------------------------------------ dead reckoning controls
+const KEEP = "Without GPS it carries on with the last good GPS speed and course, turned by every turn the gyro feels. The phone can sit in any position as long as it stays put.";
 const MODE_HELP = {
   foot: "Each step moves the estimate one step length along the heading. Hold the phone pointing where you walk.",
-  boat: "Carries on with the last good GPS speed and course, turned by every turn the gyro feels. Or type the log speed and course.",
+  bike: KEEP + " Best on a handlebar mount.",
+  car: KEEP + " Also for trains and buses. Speed changes (traffic, stations) make the error grow quickly.",
+  boat: KEEP + " Or type the log speed and steering-compass course.",
+  plane: KEEP + " Wind changes make the error grow about 5 m every second. GPS works best at a window seat.",
   off: "No estimate without GPS.",
 };
 function renderMode() {
   const m = dr.mode;
   document.querySelectorAll("#mode-seg button").forEach((b) => b.classList.toggle("on", b.dataset.mode === m));
   $("#mode-help").textContent = MODE_HELP[m];
-  $("#boat-box").classList.toggle("hidden", m !== "boat");
+  $("#boat-box").classList.toggle("hidden", !VEHICLES.has(m));
+  $("#boat-speed").placeholder = m === "boat" || m === "plane" ? "Speed (knots)" : "Speed (km/h)";
 }
-$("#mode-seg").addEventListener("click", (e) => { const m = e.target.dataset.mode; if (m) { dr.setMode(m); renderMode(); } });
+function setTravel(m) {
+  const before = TRAVEL[mode()].align;
+  dr.setMode(m);
+  ins.setMaxSpeed(TRAVEL[m].maxSpeed);
+  if (ins.state === "align" && TRAVEL[m].align !== before) ins.realign();
+  renderMode();
+}
+$("#mode-seg").addEventListener("click", (e) => { const m = e.target.dataset.mode; if (m) setTravel(m); });
 $("#btn-boat").onclick = () => {
   const sp = parseFloat(String($("#boat-speed").value).replace(",", "."));
   const c = parseFloat($("#boat-course").value);
   if (!(sp >= 0)) return;
-  dr.setMode("boat", sp, Number.isFinite(c) ? ((c % 360) + 360) % 360 : null);
+  const kn = dr.mode === "boat" || dr.mode === "plane" ? sp : sp / 1.852;
+  dr.setMode(dr.mode, kn, Number.isFinite(c) ? ((c % 360) + 360) % 360 : null);
   renderMode();
 };
-$("#btn-boat-gps").onclick = () => { dr.setMode("boat"); renderMode(); };
+$("#btn-boat-gps").onclick = () => { dr.setMode(dr.mode); renderMode(); };
 $("#btn-pos").onclick = () => {
   const p = parseCoords($("#pos-in").value);
   const err = $("#pos-err");
@@ -276,7 +324,6 @@ $("#btn-pos").onclick = () => {
 
 // ------------------------------------------------------------------ INS controls
 $("#btn-realign").onclick = () => { toastGap = ""; ins.realign(); };
-$("#sea").onchange = (e) => { store.set("sea", e.target.checked); ins.realign(); };
 $("#btn-hdg").onclick = () => {
   const v = parseFloat($("#hdg-in").value);
   if (!Number.isFinite(v)) return;
@@ -343,8 +390,8 @@ $("#set-action").onchange = (e) => { ins.spoofAction = e.target.value; store.set
 $("#set-night").checked = !!store.get("night");
 document.documentElement.dataset.night = store.get("night") ? "1" : "0";
 $("#set-night").onchange = (e) => { store.set("night", e.target.checked); document.documentElement.dataset.night = e.target.checked ? "1" : "0"; };
-$("#sea").checked = !!store.get("sea");
-$("#start-sea").checked = !!store.get("sea");
+$("#start-mode").value = mode();
+$("#btn-trip").onclick = () => { S.trip = { m: 0, since: now() }; store.set("trip", S.trip); S.odoLast = null; };
 $("#btn-clear").onclick = () => { dr.track = []; store.set("track", []); };
 $("#btn-gpx").onclick = () => {
   const pts = dr.track.map(([t, la, lo]) => `<trkpt lat="${la.toFixed(6)}" lon="${lo.toFixed(6)}"><time>${new Date(t * 1000).toISOString()}</time></trkpt>`).join("\n");
@@ -366,13 +413,13 @@ function showMain() {
   render();
 }
 $("#btn-start").onclick = async () => {
-  store.set("sea", $("#start-sea").checked); $("#sea").checked = $("#start-sea").checked;
+  setTravel($("#start-mode").value);
   ins.realign();
   try { await startSensors(); showMain(); }
   catch (err) { const e = $("#start-err"); e.textContent = err.message; e.classList.remove("hidden"); }
 };
 $("#btn-demo").onclick = () => {
-  store.set("sea", $("#start-sea").checked); $("#sea").checked = $("#start-sea").checked;
+  setTravel($("#start-mode").value);
   ins.realign();
   S.demo = true;
   startDemo({ onMotion, onOrientation, onPosition, ins });

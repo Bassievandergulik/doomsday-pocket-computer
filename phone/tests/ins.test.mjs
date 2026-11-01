@@ -268,3 +268,51 @@ test("typed coordinates", () => {
   assert.equal(d("hello"), null);
   assert.equal(d("95 10"), null);
 });
+
+test("car mode: dead reckoning carries on and turns with the gyro, any mount", () => {
+  const ins = { h: 37, heading() { return this.h; }, vet() { return true; } };
+  let fix = { mode: 3, lat: 52, lon: 5, speed: 20, track: 90 };
+  let t = 1000;
+  const dr = new DeadReckoner({ getFix: () => fix, getHeading: () => null, store: memStore(), ins, clock: () => t });
+  dr.setMode("car");
+  dr.tick(t);
+  fix = { mode: 0 };
+  ins.h = 37 - 90;                             // phone mounted at 37 deg; the car turns 90 deg left
+  for (let k = 1; k <= 10; k++) { t = 1000 + k; dr.tick(t); }
+  const e = dr.estimate();
+  near((e.lat - 52) * 111320, 200, 2);           // heading north now at 20 m/s
+  assert.ok(e.err_m > 50 && e.err_m < 120);
+});
+
+test("plane mode allows airliner speed but still flags a jump", () => {
+  const s = new Sim();
+  s.ins.setMaxSpeed(350);
+  s.psi = 0; s.speed = 230;                     // cruising at 230 m/s from the start
+  s.step(40);
+  s.ins.setHeading(0);
+  s.step(20);
+  assert.equal(s.ins.status().gps, "ok");
+  s.step(2, { gpsPos: [s.lat + 0.05, s.lon] });
+  assert.equal(s.ins.status().gps, "suspect");
+});
+
+test("vehicle alignment tolerates vibration", () => {
+  const s = new Sim();
+  s.ins.getAlign = () => "vehicle";
+  s.ins.realign();
+  s.rollAmp = 1.5;
+  s.step(60);
+  assert.equal(s.ins.status().state, "nav");
+});
+
+test("without a course reference the GPS course does not pull the heading", () => {
+  const s = new Sim();
+  s.ins.courseRef = () => false;
+  s.step(40);
+  s.compassOn = false;
+  s.psi = 0; s.ins.setHeading(30);              // phone mounted 30 deg off the direction of travel
+  s.speed = 10;
+  s.step(60);
+  near(s.ins.heading(), 30, 2);
+  assert.equal(s.ins.status().notes.length, 0);
+});

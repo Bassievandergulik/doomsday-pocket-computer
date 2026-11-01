@@ -23,6 +23,21 @@ const MODELS = {
   default: { noise: [0.05, 0.002], pull: 0.4, blim: 0.6, dvTol: 3.5 },
 };
 
+// How you travel decides how the INS aligns, how fast GPS may plausibly move, whether steps count,
+// and how quickly the dead-reckoning error grows (metres: base + perDist x distance + perSec x seconds).
+export const TRAVEL = {
+  foot: { align: "still", maxSpeed: 60, steps: true, err: [10, 0.05, 0] },
+  bike: { align: "vehicle", maxSpeed: 60, err: [30, 0.1, 0.5] },
+  car: { align: "vehicle", maxSpeed: 90, err: [50, 0.15, 1.0] },
+  boat: { align: "sea", maxSpeed: 60, err: [50, 0.1, 0.25] },    // current and leeway: ~0.5 kn unknown drift
+  plane: { align: "vehicle", maxSpeed: 350, err: [300, 0.03, 5.0] }, // wind changes
+  off: { align: "still", maxSpeed: 60, steps: true, err: [0, 0, 0] },
+};
+export const VEHICLES = new Set(["bike", "car", "boat", "plane"]);
+// still: any movement restarts the count. sea: rocking is fine, moving seconds are skipped.
+// vehicle: engine vibration and small bumps are fine, seconds with real turns or bumps are skipped.
+const ALIGN = { still: [30, 0.8, 0.08, false], sea: [60, 8.0, 0.35, true], vehicle: [45, 2.0, 0.25, true] };
+
 export const wrap180 = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
 const mod360 = (d) => ((d % 360) + 360) % 360;
 
@@ -135,7 +150,7 @@ export class SpoofMonitor {
       const dc = wrap180(cur.track - old.track), dp = wrap180(cur.psi - old.psi);
       if (Math.abs(wrap180(dc - dp)) > 25) flags.push([2, `GPS course turned ${Math.round(dc)}° but the gyro felt ${Math.round(dp)}°`]);
     }
-    if (aligned && snap.psi != null && (snap.psiSigma || 99) < 20 && (cur.speed || 0) > 3 && cur.track != null
+    if (aligned && snap.courseRef !== false && snap.psi != null && (snap.psiSigma || 99) < 20 && (cur.speed || 0) > 3 && cur.track != null
         && Math.abs(wrap180(cur.track - snap.psi)) > 70) {
       flags.push([1, `GPS course differs ${Math.round(Math.abs(wrap180(cur.track - snap.psi)))}° from the heading`]);
     }
@@ -175,8 +190,8 @@ export class SpoofMonitor {
 
 // ------------------------------------------------------------------------------------------ alignment
 class Align {
-  constructor(need, rms, aTol, sea, t0) {
-    Object.assign(this, { need, rms, aTol, sea, t0 });
+  constructor(need, rms, aTol, lenient, t0, profile) {
+    Object.assign(this, { need, rms, aTol, lenient, t0, profile });
     this.block = [];
     this.blockComp = [];
     this.n = 0;
@@ -204,7 +219,7 @@ class Align {
       for (let i = 0; i < 3; i++) { this.sumG[i] += mg[i]; this.sumA[i] += ma[i]; }
       this.n += 1;
       this.comp.push(...bc);
-    } else if (!this.sea) {
+    } else if (!this.lenient) {
       this.n = 0;
       this.sumG = [0, 0, 0];
       this.sumA = [0, 0, 0];
@@ -223,15 +238,18 @@ class Align {
 // ------------------------------------------------------------------------------------------ the INS
 export class INS {
   /**
-   * opts: model ("phone", "ICM-42688-P" or "default"), getSea() -> true at sea, getSteps() -> step count,
+   * opts: model ("phone", "ICM-42688-P" or "default"), getAlign() -> "still", "sea" or "vehicle"
+   * (or getSea() -> true at sea), courseRef() -> true when the device points the way you travel, so the
+   * GPS course may correct the heading, getSteps() -> step count,
    * getRef() -> [lat, lon, err_m] of the dead-reckoning estimate, clock() -> seconds,
    * spoofAction ("switch" = stop using a suspect GPS, "warn" = only show it), compassSigma, maxSpeed.
    */
   constructor(opts = {}) {
     const o = { model: "phone", getSea: () => false, getSteps: () => null, getRef: () => null,
-      clock: () => Date.now() / 1000, spoofAction: "switch", compassSigma: 6.0, maxSpeed: 60, ...opts };
+      courseRef: () => true, clock: () => Date.now() / 1000, spoofAction: "switch", compassSigma: 6.0, maxSpeed: 60, ...opts };
     this.model = o.model;
-    this.getSea = o.getSea; this.getSteps = o.getSteps; this.getRef = o.getRef; this.clock = o.clock;
+    this.getAlign = o.getAlign || (() => (o.getSea() ? "sea" : "still"));
+    this.courseRef = o.courseRef; this.getSteps = o.getSteps; this.getRef = o.getRef; this.clock = o.clock;
     this.spoofAction = o.spoofAction; this.compassSigma = o.compassSigma;
     const m = MODELS[o.model] || MODELS.default;
     [this.qpsi, this.qb] = m.noise;
@@ -255,8 +273,9 @@ export class INS {
     this.degraded = false;
     this.rate = 0; this.tilt = 0;
     this.lastT = null;
-    const sea = !!this.getSea();
-    this.align = new Align(sea ? 60 : 30, sea ? 8.0 : 0.8, sea ? 0.35 : 0.08, sea, t);
+    const profile = ALIGN[this.getAlign()] ? this.getAlign() : "still";
+    const [need, rms, aTol, lenient] = ALIGN[profile];
+    this.align = new Align(need, rms, aTol, lenient, t, profile);
     this.state = "align";
   }
 
@@ -266,6 +285,9 @@ export class INS {
   setHeading(deg) {
     if (this.state === "nav" || this.state === "nav-degraded") { this.psi = mod360(deg); this.p00 = 3 ** 2; }
   }
+
+  /** Fastest plausible GPS movement in m/s (an airliner is ~250 m/s). */
+  setMaxSpeed(v) { this.monitor.maxSpeed = v; }
 
   trustGps(minutes = 30) { this.monitor.trust(this.clock(), minutes); this.vetKey = undefined; }
 
@@ -362,7 +384,7 @@ export class INS {
       al.tBlock = t;
       al.closeBlock();
       if (al.done()) this.finishAlign(t);
-      else if (t - al.t0 > (al.sea ? 240 : 150)) this.finishAlign(t, true);
+      else if (t - al.t0 > (al.lenient ? 240 : 150)) this.finishAlign(t, true);
     }
   }
 
@@ -395,9 +417,9 @@ export class INS {
     this.vetKey = key;
     const t = this.clock();
     this.amax = this.amaxRun; this.amaxRun = 0;
-    this.monitor.evaluate(t, f, this.snapshot(), this.getSteps(), this.getRef());
+    this.monitor.evaluate(t, f, { ...this.snapshot(), courseRef: this.courseRef() }, this.getSteps(), this.getRef());
     this.vetResult = !(this.spoofAction === "switch" && this.monitor.suspect(t));
-    if (this.vetResult && (this.state === "nav" || this.state === "nav-degraded") && !this.monitor.suspect(t)) {
+    if (this.vetResult && this.courseRef() && (this.state === "nav" || this.state === "nav-degraded") && !this.monitor.suspect(t)) {
       const sp = f.speed, tr = f.track;
       if (sp != null && tr != null && sp > 1.5 && (f.hdop || 1) < 3) this.update(tr, 12 + 20 / sp, 60);
     }
@@ -408,7 +430,7 @@ export class INS {
     const t = this.clock(), m = this.monitor;
     const gps = m.suspect(t) ? "suspect" : t < m.trustUntil ? "trusted-by-hand" : "ok";
     return { model: this.model, state: this.state, alignPct: this.align ? this.align.pct : 100,
-      alignSea: this.align ? this.align.sea : null, degraded: this.degraded, heading: this.heading(),
+      alignProfile: this.align ? this.align.profile : null, degraded: this.degraded, heading: this.heading(),
       headingSigma: this.psi != null ? Math.round(Math.sqrt(Math.max(this.p00, 0)) * 10) / 10 : null,
       gyroBias: this.bias.map((x) => Math.round(x * 1000) / 1000), tilt: Math.round(this.tilt * 10) / 10,
       turnDps: Math.round(this.rate * 100) / 100, gps, reasons: gps === "suspect" ? m.reasons.slice() : [],
@@ -439,7 +461,7 @@ export class StepDetector {
 // ------------------------------------------------------------------------------------------ dead reckoning
 /**
  * On foot: each step moves the estimate one step length along the heading (step length learns from GPS).
- * At sea: the estimate carries on with the last trusted GPS speed and course, or one you type in,
+ * By bike, car, boat or plane: the estimate carries on with the last trusted GPS speed and course, or one you type in,
  * and the gyro rotates that course by every turn felt since.
  * store: {get(key), set(key, value)} for settings that should survive a restart.
  */
@@ -461,10 +483,10 @@ export class DeadReckoner {
   get mode() { return this.store.get("dr_mode") || "foot"; }
 
   setMode(mode, speedKn = null, course = null) {
-    if (!["foot", "boat", "off"].includes(mode)) throw new Error("mode must be foot, boat or off");
+    if (!TRAVEL[mode]) throw new Error("mode must be one of " + Object.keys(TRAVEL).join(", "));
     this.store.set("dr_mode", mode);
-    if (mode === "boat") {
-      this.store.set("dr_boat", speedKn != null
+    if (VEHICLES.has(mode)) {
+      this.store.set("dr_vehicle", speedKn != null
         ? { speed_kn: speedKn, course, ref_heading: this.insHeading(), set: this.clock() } : null);
     }
   }
@@ -476,7 +498,8 @@ export class DeadReckoner {
       && (!this.ins || this.ins.vet(f));
   }
 
-  /** Once a second: follow GPS while it has a trusted fix, otherwise extrapolate at sea. */
+  /** Once a second: follow GPS while it has a trusted fix, otherwise extrapolate in a vehicle or boat.
+   * Only turns felt since the last fix are used, so the phone may sit in any fixed position. */
   tick(t = this.clock()) {
     const dt = t - this.lastT;
     this.lastT = t;
@@ -498,8 +521,8 @@ export class DeadReckoner {
       this.pos = [m.lat, m.lon];
       this.dist = 0;
     }
-    if (!this.pos || this.mode !== "boat" || dt <= 0 || dt > 30) return;
-    const boat = this.store.get("dr_boat") || {};
+    if (!this.pos || !VEHICLES.has(this.mode) || dt <= 0 || dt > 30) return;
+    const boat = this.store.get("dr_vehicle") || {};
     let speed, course, ref;
     if (boat.speed_kn != null) [speed, course, ref] = [boat.speed_kn * 0.514444, boat.course, boat.ref_heading];
     else if (this.lastGood) [speed, course, ref] = [this.lastGood[3], this.lastGood[4], this.refHeading];
@@ -552,7 +575,8 @@ export class DeadReckoner {
     if (!this.pos || !this.anchor || this.mode === "off") return null;
     if (this.anchor.source === "gps" && this.dist === 0 && this.fixOk(this.getFix())) return null;
     const age = this.clock() - this.anchor.t;
-    let err = this.mode === "boat" ? 50 + 0.1 * this.dist + 0.25 * age : 10 + 0.05 * this.dist;
+    const [e0, ed, et] = TRAVEL[this.mode].err;
+    let err = e0 + ed * this.dist + et * age;
     if (this.anchor.source === "manual") err += 100;
     return { lat: this.pos[0], lon: this.pos[1], err_m: Math.round(err), mode: this.mode,
       dist_m: Math.round(this.dist), since: this.anchor.t, from: this.anchor.source,

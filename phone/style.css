@@ -37,8 +37,8 @@ input[type=checkbox], .row > input[type=checkbox] { flex: none; width: 20px; hei
 label.row { margin-top: 10px; }
 .field { display: block; margin-top: 10px; font-size: 14px; }
 .field input, .field select { margin-top: 4px; }
-.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.seg button { flex: 1; border: 0; border-radius: 0; background: transparent; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; padding: 8px 4px; font-size: 14px; border-radius: 0; background: transparent; }
 .seg button.on { background: var(--accent); color: #04121f; font-weight: 600; }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; text-align: center; }
 .rose-wrap { position: relative; width: min(78vw, 300px); margin: 0 auto; aspect-ratio: 1; }

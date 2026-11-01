@@ -28,11 +28,16 @@
   <h2>Before you start</h2>
   <p>This works fully offline once it is installed. It uses the phone's gyro, accelerometer, compass and GPS.</p>
   <ol>
-    <li>Lay the phone still, screen up, for about 30 seconds while it aligns (at sea: 60 seconds, rocking is fine).</li>
+    <li>Let it align: on foot, lay the phone still, screen up, for about 30 seconds. In a vehicle or boat, put it somewhere it stays put for about a minute (moving is fine).</li>
     <li>Keep the app open: phones pause the sensors when the screen locks, so it keeps the screen on.</li>
-    <li>The heading is the direction the <b>top of the phone</b> points. Hold or mount it pointing the way you go.</li>
+    <li>The heading is the direction the <b>top of the phone</b> points. On foot, hold it pointing the way you go.</li>
   </ol>
-  <label class="row"><input type="checkbox" id="start-sea"> I'm on a boat (sea alignment)</label>
+  <label class="field">How are you travelling?
+    <select id="start-mode">
+      <option value="foot">On foot</option><option value="bike">Bike</option><option value="car">Car, train or bus</option>
+      <option value="boat">Boat</option><option value="plane">Plane</option>
+    </select>
+  </label>
   <button id="btn-start" class="primary">Start sensors</button>
   <button id="btn-demo" class="ghost">Try with simulated sensors</button>
   <p id="start-err" class="err hidden"></p>
@@ -81,12 +86,14 @@
       <div><span class="muted">Course</span><br><b id="crs">-</b></div>
       <div><span class="muted">Steps</span><br><b id="steps">0</b></div>
     </div>
+    <div class="row small"><span class="muted">Trip</span> <b id="trip">0 m</b><span style="flex:1"></span><button id="btn-trip" class="ghost">Reset trip</button></div>
   </section>
 
   <section class="card">
     <h2>Dead reckoning</h2>
     <div class="seg" id="mode-seg">
-      <button data-mode="foot">On foot</button><button data-mode="boat">Boat</button><button data-mode="off">Off</button>
+      <button data-mode="foot">On foot</button><button data-mode="bike">Bike</button><button data-mode="car">Car / train</button>
+      <button data-mode="boat">Boat</button><button data-mode="plane">Plane</button><button data-mode="off">Off</button>
     </div>
     <p class="muted small" id="mode-help"></p>
     <div id="boat-box" class="hidden">
@@ -108,7 +115,6 @@
     <h2>Inertial unit</h2>
     <div class="row">
       <button id="btn-realign" class="ghost">Realign (hold still)</button>
-      <label class="row small"><input type="checkbox" id="sea"> At sea</label>
     </div>
     <div class="row">
       <input id="hdg-in" type="number" inputmode="numeric" placeholder="Heading from a steering compass (°)">
@@ -156,7 +162,7 @@
   <section class="card muted small">
     <h2>What this can and cannot do</h2>
     <p>A phone gyro drifts tens of degrees per hour, so it cannot measure position on its own like an airliner's INS. It keeps a steady heading through turns, rolling and nearby magnets, and checks every GPS fix against what the sensors felt: sudden jumps, speed changes nothing pushed, turns the gyro didn't feel, steps while GPS says you stand still.</p>
-    <p>Position without GPS is speed × heading (at sea) or steps × step length (on foot). It does not know the current or leeway, so the uncertainty grows over time. A slow, steady drag of the GPS position can look like normal movement and is only caught once it exceeds that uncertainty.</p>
+    <p>Position without GPS is speed × course (bike, car, boat, plane) or steps × step length (on foot). It does not know the current, wind or speed changes, so the uncertainty grows over time. A slow, steady drag of the GPS position can look like normal movement and is only caught once it exceeds that uncertainty.</p>
   </section>
 </main>
 
