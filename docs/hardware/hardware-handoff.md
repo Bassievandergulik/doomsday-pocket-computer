@@ -1,9 +1,10 @@
 # Pocket computer hardware: handoff (31 Oct 2026)
 
+Software repo: https://github.com/Bassievandergulik/doomsday-pocket-computer
 Main doc with the shopping list, links and wiring: https://claude.ai/artifact/QAD9JDTUvJHv9fZqXvWDdL
 Next steps, other boards and add-ons: https://claude.ai/artifact/UgNt2oEdvyDaBiR3sVfm47
 
-## Final build (about €200 to €215; solar panel deferred, about €25 to €35 if added later)
+## Final build (about €200 to €215 electronics plus about €15 sealing parts; solar panel deferred, about €25 to €35 if added later)
 - Board: Raspberry Pi Zero 2 WH (sold out at Welectron, BerryBase, Kiwi, Kubii and Elektronica voor jou; stock alerts needed). Plan B: Pi 3 A+.
 - Screen: Waveshare 3.5" RPi LCD (A), resistive touch, the only input (no keyboard).
 - Storage: 128 GB high-endurance microSD (about €35 now), plus a second card as a backup copy.
@@ -14,6 +15,8 @@ Next steps, other boards and add-ons: https://claude.ai/artifact/UgNt2oEdvyDaBiR
 - Audio: PAM8403 with L+R inputs joined; Si4732 and sound stick each fed in through 10 kΩ; 2 thin 40 mm speakers, one per channel, for redundancy. A spare PAM8403 is included (Bas said yes, 31 Oct 2026).
 - Light: 1 W white LED (GPIO12) and red LED (GPIO13), each through a MOSFET with a 100 Ω gate resistor and 10 kΩ pull-down.
 - Case: printed by Bas in ASA (or PETG), O-ring seal (NBR/EPDM), TPU bumpers, conformal coating (essential at sea), about 110 × 85 × 45 mm, 250 to 350 g.
+- Optional: Meshtastic LoRa node (Heltec V3 / LilyGO T-Echo, about €25-40) on the USB hub; app/mesh.py in the radio tab, untested with real nodes. No two-way satellite (carry a PLB or messenger separately).
+- Fallback board if Pis stay sold out: Radxa Zero 3W (see docs/boards.md in the software; needs GPIO changes, untested). Pi stays default.
 - Dropped: CardKB keyboard, RDA5807M, local chatbot, floating pouch, PiSugar 3.
 
 ## Still open
