@@ -4,9 +4,9 @@ On foot: an accelerometer (MPU-6050 / GY-521, or the MPU-6500/9250 clones sold
 under that name) counts steps; each step moves the estimate one step length in
 the compass direction. The step length learns itself from GPS while there is a fix.
 
-At sea (or in a vehicle): steps mean nothing on a rocking boat, so the estimate
-carries on with the last GPS speed and course (or a speed and course you enter,
-e.g. from the boat's log and steering compass).
+At sea, or in a car, plane or on a bike ("vehicle" mode): steps mean nothing there, so the estimate
+carries on with the last GPS speed and course (or a speed and course you enter, e.g. from the boat's log,
+the speedometer or the aircraft's instruments), turned by every turn the gyro feels (ins.py).
 
 The estimate starts from the last GPS fix, or from a position you set by hand
 ("I am here"), and its uncertainty grows with distance and time.
@@ -147,13 +147,13 @@ class DeadReckoner:
     # --- settings ---------------------------------------------------------
     @property
     def mode(self):
-        return self._get("dr_mode") or "foot"   # "foot", "boat" or "off"
+        return self._get("dr_mode") or "foot"   # "foot", "boat", "vehicle" (car, bike, plane) or "off"
 
     def set_mode(self, mode, speed_kn=None, course=None):
-        if mode not in ("foot", "boat", "off"):
-            raise ValueError("mode must be foot, boat or off")
+        if mode not in ("foot", "boat", "vehicle", "off"):
+            raise ValueError("mode must be foot, boat, vehicle or off")
         self._set("dr_mode", mode)
-        if mode == "boat":
+        if mode in ("boat", "vehicle"):
             self._set("dr_boat", {"speed_kn": speed_kn, "course": course, "ref_heading": self._ins_heading(),
                                   "set": time.time()} if speed_kn is not None else None)
 
@@ -206,7 +206,7 @@ class DeadReckoner:
                 # a position set by hand is a fresh starting point
                 self.anchor = {"lat": m["lat"], "lon": m["lon"], "t": m.get("set", t), "source": "manual"}
                 self.pos, self.dist = (m["lat"], m["lon"]), 0.0
-            if self.pos is None or self.mode != "boat" or dt <= 0 or dt > 30:
+            if self.pos is None or self.mode not in ("boat", "vehicle") or dt <= 0 or dt > 30:
                 return
             boat = self._get("dr_boat") or {}
             ref = None
@@ -275,6 +275,8 @@ class DeadReckoner:
             age = time.time() - self.anchor["t"]
             if self.mode == "boat":
                 err = 50 + 0.10 * self.dist + 0.25 * age  # current and leeway: ~0.5 kn unknown drift
+            elif self.mode == "vehicle":
+                err = 50 + 0.20 * self.dist  # speed changes (traffic, wind) are not measured: a rough guess
             else:
                 err = 10 + 0.05 * self.dist
             if self.anchor["source"] == "manual":

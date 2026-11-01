@@ -288,9 +288,13 @@ async function drRefresh() {
   const d = await api("/api/dr");
   S.drStatus = d;
   document.querySelectorAll("#dr-mode button").forEach(b => b.classList.toggle("on", b.dataset.m === d.mode));
-  $("#dr-boat-row").classList.toggle("hidden", d.mode !== "boat");
+  const veh = d.mode === "vehicle";
+  $("#dr-boat-row").classList.toggle("hidden", d.mode !== "boat" && !veh);
   const b = d.boat;
-  $("#dr-boat").textContent = b && b.speed_kn != null ? `Boat: ${b.speed_kn} kn, course ${b.course != null ? b.course + "°" : "from compass"} (change)` : "Boat: using last GPS speed and course (set by hand...)";
+  const what = veh ? "Vehicle" : "Boat";
+  $("#dr-boat").textContent = b && b.speed_kn != null
+    ? `${what}: ${veh ? Math.round(b.speed_kn * 1.852) + " km/h" : b.speed_kn + " kn"}, course ${b.course != null ? b.course + "°" : "from compass"} (change)`
+    : `${what}: using last GPS speed and course, turned by the gyro (set by hand...)`;
   insRefresh();
   $("#dr-info").textContent = (d.imu ? `Step counter: ${d.imu}, ${d.steps} steps, step length ${Math.round(d.step_len * 100)} cm (learns from GPS). `
     : "No step sensor found: on foot the estimate cannot move by itself. ") +
@@ -302,7 +306,7 @@ function insRender(i) {
   const card = $("#ins-card");
   card.classList.toggle("hidden", !i.available);
   if (!i.available) return;
-  const stateTxt = i.state === "align" ? `ALIGN ${i.align_pct}%: keep the device still${i.sea ? " (rocking is fine)" : ""}`
+  const stateTxt = i.state === "align" ? `ALIGN ${i.align_pct}%: keep the device still${i.sea ? " (moving is fine)" : ""}`
     : i.state === "nav-degraded" ? "NAV (not fully aligned)" : "NAV";
   let html = `<b>Inertial navigation ${stateTxt}</b> · ${i.model}`;
   if (i.heading != null) html += `<br>Gyro heading ${Math.round(i.heading)}° ±${Math.max(1, Math.round(i.heading_sigma))}° · turning ${i.turn_dps.toFixed(1)}°/s`;
@@ -337,12 +341,15 @@ $("#dr-mode").onclick = async (e) => {
 };
 $("#dr-boat").onclick = async () => {
   const b = (S.drStatus && S.drStatus.boat) || {};
-  const v = await askText("Boat speed in knots and course in degrees (e.g. 5.5 230). Course empty = use the compass. Empty = last GPS speed and course.",
-    b.speed_kn != null ? `${b.speed_kn} ${b.course ?? ""}`.trim() : "");
+  const veh = S.drStatus && S.drStatus.mode === "vehicle";
+  const unit = veh ? 1.852 : 1;  // vehicles: km/h, boats: knots
+  const v = await askText(veh ? "Speed in km/h and course in degrees (e.g. 80 230). Course empty = use the compass. Empty = last GPS speed and course."
+    : "Boat speed in knots and course in degrees (e.g. 5.5 230). Course empty = use the compass. Empty = last GPS speed and course.",
+    b.speed_kn != null ? `${Math.round(b.speed_kn * unit * 10) / 10} ${b.course ?? ""}`.trim() : "");
   if (v === null) return;
   const n = v.trim().split(/[\s,]+/).filter(Boolean).map(Number);
   if (n.some(isNaN) || n.length > 2) return toast("Type a speed and a course, e.g. 5.5 230");
-  await api("/api/dr", { mode: "boat", speed_kn: n.length ? n[0] : null, course: n.length > 1 ? n[1] % 360 : null });
+  await api("/api/dr", { mode: veh ? "vehicle" : "boat", speed_kn: n.length ? n[0] / unit : null, course: n.length > 1 ? n[1] % 360 : null });
   drRefresh();
 };
 $("#go-clear").onclick = () => setTarget(null);

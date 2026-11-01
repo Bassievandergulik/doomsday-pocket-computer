@@ -19,16 +19,18 @@ class FakeIMU:
 class Sim:
     """A device on a boat or table. Time is simulated; INS.clock reads it."""
 
-    def __init__(self, seed=1, sea=False, bias=(0.3, -0.2, 0.5), gps=True):
+    def __init__(self, seed=1, sea=False, bias=(0.3, -0.2, 0.5), gps=True, vehicle=False):
         random.seed(seed)
         self.t = 1000.0
         self.bias = bias
         self.fix = {"mode": 0}
         self.steps = 0
         self.ins = insmod.INS(FakeIMU(), lambda: None, lambda: self.fix, ({}.get, {}.__setitem__),
-                              get_sea=lambda: sea, get_steps=lambda: self.steps)
+                              get_sea=lambda: sea or vehicle, get_steps=lambda: self.steps,
+                              get_vehicle=lambda: vehicle)
         self.ins.clock = lambda: self.t
-        self.psi = 90.0          # true heading, deg clockwise
+        self.psi = 90.0          # true heading of the device, deg clockwise
+        self.crab = 0.0          # travel direction minus device heading (device on a car seat at an angle)
         self.lat, self.lon = 50.0, -10.0
         self.speed = 0.0         # m/s along the heading (the boat goes where it points)
         self.acc_fwd = 0.0       # m/s2 along the heading
@@ -46,7 +48,8 @@ class Sim:
             self.t += 0.02
             self.psi = (self.psi + self.turn * 0.02) % 360
             self.speed += self.acc_fwd * 0.02
-            v = (self.speed * math.sin(math.radians(self.psi)), self.speed * math.cos(math.radians(self.psi)))
+            trav = math.radians(self.psi + self.crab)
+            v = (self.speed * math.sin(trav), self.speed * math.cos(trav))
             self.acc = ((v[0] - self.v[0]) / 0.02, (v[1] - self.v[1]) / 0.02)   # includes the centripetal push
             self.v = v
             self.lat += self.v[1] * 0.02 / 111320.0
@@ -219,6 +222,60 @@ class SpoofTest(unittest.TestCase):
         s.step(2, gps_pos=(s.lat + 0.01, s.lon))
         self.assertEqual(s.ins.status()["gps"], "suspect")
         self.assertTrue(s.ins.gps_trusted())             # flagged on screen, but still used
+
+
+class VehicleTest(unittest.TestCase):
+    def test_airliner_is_not_a_jump(self):
+        s = Sim(vehicle=True)
+        s.step(70)
+        self.assertEqual(s.ins.status()["state"], "nav")
+        s.acc_fwd = 3.0                                # take-off run and climb, up to ~830 km/h
+        s.step(76.6)
+        s.acc_fwd = 0.0
+        s.step(60)
+        s.turn = 3.0                                   # standard-rate turn
+        s.step(30)
+        s.turn = 0.0
+        s.step(30)
+        st = s.ins.status()
+        self.assertEqual(st["gps"], "ok", st)
+        self.assertEqual(st["flags_total"], 0)
+
+    def test_device_at_an_angle_in_a_car(self):
+        s = Sim(vehicle=True)
+        s.step(70)
+        s.crab = 50.0                                  # phone-holder or seat: device points 50 deg off the road
+        s.speed = 25.0
+        s.step(60)
+        s.turn = 9.0
+        s.step(10)                                     # 90 degree corner
+        s.turn = 0.0
+        s.step(60)
+        st = s.ins.status()
+        self.assertEqual(st["gps"], "ok", st)
+        self.assertAlmostEqual(s.ins.heading(), s.psi, delta=3)   # GPS course did not drag the heading
+
+    def test_car_still_catches_a_jump(self):
+        s = Sim(vehicle=True)
+        s.step(70)
+        s.speed = 25.0
+        s.step(20)
+        s.step(2, gps_pos=(s.lat + 0.05, s.lon))      # 5.5 km in a second is too fast even for a plane
+        self.assertEqual(s.ins.status()["gps"], "suspect")
+
+    def test_vehicle_dead_reckoning(self):
+        fix = [{"mode": 3, "lat": 52.0, "lon": 5.0, "speed": 25.0, "track": 0.0}]
+        st = {}
+        dr = deadreck.DeadReckoner(None, lambda: fix[0], lambda: None, lambda: None, (st.get, st.__setitem__))
+        dr.set_mode("vehicle")
+        dr.tick(1000.0)
+        fix[0] = {"mode": 1}
+        for k in range(1, 11):
+            dr.tick(1000.0 + k)
+        e = dr.estimate()
+        self.assertAlmostEqual((e["lat"] - 52.0) * 111320, 250, delta=1)
+        self.assertEqual(e["mode"], "vehicle")
+        self.assertEqual(e["err_m"], round(50 + 0.2 * 250))
 
 
 class TurnTrackingTest(unittest.TestCase):

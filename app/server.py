@@ -172,7 +172,8 @@ class App:
             return (a["lat"], a["lon"], 100.0) if a else None
 
         self.ins = ins_mod.INS(self.imu if self.config["ins_enabled"] else None, compass_true, self.gps.get,
-                               (self.get_setting, self.set_setting), get_sea=lambda: getattr(self, "dr", None) is not None and self.dr.mode == "boat",
+                               (self.get_setting, self.set_setting), get_sea=lambda: getattr(self, "dr", None) is not None and self.dr.mode in ("boat", "vehicle"),
+                               get_vehicle=lambda: getattr(self, "dr", None) is not None and self.dr.mode == "vehicle",
                                get_steps=lambda: self.dr.steps.count if getattr(self, "dr", None) is not None and self.dr.mode == "foot" else None,
                                get_ref=dr_ref, mount=self.config["ins_mount"],
                                spoof_action=self.config["ins_spoof_action"],

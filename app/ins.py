@@ -69,8 +69,9 @@ class SpoofMonitor:
 
     def __init__(self, max_speed=60.0, hold_s=300.0, dv_tol=2.0):
         self.max_speed, self.hold_s, self.dv_tol = max_speed, hold_s, dv_tol
+        self.course_vs_heading = True   # off in vehicles: the device need not point where you travel
         self.prev = None
-        self.hist = deque(maxlen=14)
+        self.hist = deque(maxlen=40)
         self.suspect_until = 0.0
         self.latched = False
         self.reasons = []
@@ -107,7 +108,7 @@ class SpoofMonitor:
                 de = (cur["lon"] - prev["lon"]) * 111320.0 * math.cos(math.radians(cur["lat"]))
                 dn = (cur["lat"] - prev["lat"]) * 111320.0
                 resid = math.hypot(de - ve * dt, dn - vn * dt)
-                if resid > 20.0 + 3.0 * dt:
+                if resid > 20.0 + 3.0 * dt + 0.1 * math.hypot(ve, vn) * dt:  # fast: allow for receiver lag
                     flags.append((2, "GPS position moved %d m more than its own speed explains" % resid))
         elif prev is not None and tfix - prev["tfix"] > 5.0:
             self.hist.clear()  # a gap (no fix for a while): start comparing afresh
@@ -126,6 +127,15 @@ class SpoofMonitor:
         if aligned and old is not None and old["v"] and cur["v"] and old["dv"] and cur["dv"]:
             dvg = (cur["v"][0] - old["v"][0], cur["v"][1] - old["v"][1])
             dvi = (cur["dv"][0] - old["dv"][0], cur["dv"][1] - old["dv"][1])
+            # a small tilt error (e.g. after a long push or a banked turn) leaks gravity into the sensed
+            # acceleration as a slow, steady drift: remove the drift seen over the previous half minute
+            base = at(33.0, 3.0)
+            if base is not None and base["v"] and base["dv"] and old["t"] - base["t"] > 10:
+                span = old["t"] - base["t"]
+                k = (cur["t"] - old["t"]) / span
+                for i in range(2):
+                    leak = ((old["dv"][i] - base["dv"][i]) - (old["v"][i] - base["v"][i])) * k
+                    dvi = (dvi[0] - leak, dvi[1]) if i == 0 else (dvi[0], dvi[1] - leak)
             resid = math.hypot(dvg[0] - dvi[0], dvg[1] - dvi[1])
             felt = max(cur["amax"], old["amax"])
             if resid > self.dv_tol + felt and max(math.hypot(*dvg), math.hypot(*dvi)) > 2.0:
@@ -139,7 +149,7 @@ class SpoofMonitor:
             dp = wrap180(cur["psi"] - old["psi"])
             if abs(wrap180(dc - dp)) > 25.0:
                 flags.append((2, "GPS course turned %d deg but the gyro felt %d deg" % (round(dc), round(dp))))
-        if aligned and snap.get("psi") is not None and (snap.get("psi_sigma") or 99) < 20 and (cur["speed"] or 0) > 3 \
+        if self.course_vs_heading and aligned and snap.get("psi") is not None and (snap.get("psi_sigma") or 99) < 20 and (cur["speed"] or 0) > 3 \
                 and cur["track"] is not None and abs(wrap180(cur["track"] - snap["psi"])) > 70:
             flags.append((1, "GPS course differs %d deg from the heading" % abs(wrap180(cur["track"] - snap["psi"]))))
         old = at(10.0, 1.5)
@@ -225,13 +235,16 @@ class _Align:
 class INS:
     def __init__(self, imu, get_compass, get_fix, settings, get_sea=lambda: False, get_steps=lambda: None,
                  get_ref=lambda: None, mount=("x", "y", "z"), rate_hz=50, spoof_action="switch",
-                 compass_sigma=6.0, max_speed=60.0):
+                 compass_sigma=6.0, max_speed=60.0, get_vehicle=lambda: False):
         """imu: deadreck.IMU (or None); get_compass() -> true heading deg or None; get_fix() -> GPS dict;
         settings: (get, set) callables; get_sea() -> True on a boat; get_steps() -> step count or None;
         get_ref() -> (lat, lon, err_m) of the dead-reckoning estimate or None."""
         self.clock = time.time  # tests replace it with a simulated clock
         self.imu, self.get_compass, self.get_fix = imu, get_compass, get_fix
         self.get_sea, self.get_steps, self.get_ref = get_sea, get_steps, get_ref
+        # get_vehicle() -> True in a car, plane or on a bike: the device may sit at any angle to the direction
+        # of travel, so GPS course says nothing about where the device points, and planes are fast
+        self.get_vehicle, self.max_speed = get_vehicle, max_speed
         self.rate_hz, self.spoof_action, self.compass_sigma = rate_hz, spoof_action, compass_sigma
         self.mount = self._mount(mount)
         self.model = getattr(imu, "model", None) if imu is not None and imu.available else None
@@ -445,9 +458,12 @@ class INS:
             self._vet_key = key
             t = self.clock()
             self.amax, self._amax_run = self._amax_run, 0.0
+            vehicle = bool(self.get_vehicle())
+            self.monitor.max_speed = max(self.max_speed, 320.0) if vehicle else self.max_speed  # airliner ~250 m/s
+            self.monitor.course_vs_heading = not vehicle
             self.monitor.evaluate(t, f, self._snapshot(), self.get_steps(), self.get_ref())
             self._vet_result = not (self.spoof_action == "switch" and self.monitor.suspect(t))
-            if self._vet_result and self.state in ("nav", "nav-degraded") and not self.monitor.suspect(t):
+            if self._vet_result and not vehicle and self.state in ("nav", "nav-degraded") and not self.monitor.suspect(t):
                 sp, tr = f.get("speed"), f.get("track")
                 if sp is not None and tr is not None and sp > 1.5 and (f.get("hdop") or 1.0) < 3.0:
                     self._update(tr, 12.0 + 20.0 / sp, gate=60.0)
