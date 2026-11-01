@@ -59,7 +59,7 @@ DEFAULT_CONFIG = {
     "sw_keep_audio": False,
     "airband_gain": 40,
     "meshtastic_port": "auto",          # USB serial port of a Meshtastic node, or "auto"
-    "board": "pi",                      # "pi" (Pi Zero 2 W / 3 A+); see docs/boards.md for alternatives
+    "board": "pi",                      # "pi" (Raspberry Pi 3 B+); see docs/boards.md for alternatives
     "light_white_gpio": 12,             # MOSFET gate of the 1 W white LED (PWM pin)
     "light_red_gpio": 13,               # MOSFET gate of the red LED (PWM pin)                 # RTL-SDR tuner gain in dB for the airband receiver             # keep the WAV recordings (about 1 MB per minute)
     "i2c_bus": 1,

@@ -49,7 +49,7 @@ class Airband:
         if not shutil.which("rtl_fm"):
             return False, "rtl_fm not installed (sudo apt install rtl-sdr)"
         if not dongle_present():
-            return False, "SDR stick not found: plug it into the USB hub"
+            return False, "SDR stick not found: plug it into a USB port of the Pi"
         if not audio.find_device(self.audio_out, playback=True):
             return False, "No sound output found (USB sound stick)"
         return True, None

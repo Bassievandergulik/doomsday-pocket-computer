@@ -1,6 +1,6 @@
 # Boards: Pi first, Radxa Zero 3W as fallback
 
-Status: **not tested on any real board.** The Pi Zero 2 W and Pi 3 A+ are sold out in the EU, so this lists what a Radxa Zero 3W would need. Everything marked "check" must be verified on hardware before buying.
+Status: **not tested on any real board.** The board is now the Raspberry Pi 3 Model B+ (decided 1 Nov 2026). This page is only for the Radxa Zero 3W fallback, should the Pi also become unavailable. Everything marked "check" must be verified on hardware before buying.
 
 ## What the software relies on, and the Radxa equivalent
 | Need | Raspberry Pi (tested in simulation) | Radxa Zero 3W (check) |

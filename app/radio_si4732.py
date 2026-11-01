@@ -9,7 +9,7 @@ loaded into the chip's RAM after every power-up. The patch is not part of this
 software: tools/get_ssb_patch.py downloads it once into data/ssb_patch.bin.
 Without it, FM/AM/SW still work and the USB/LSB bands are hidden.
 
-Wiring (Pi Zero 2 W):  SDA -> GPIO2, SCL -> GPIO3, RST -> GPIO23 (configurable),
+Wiring (Raspberry Pi 3 B+):  SDA -> GPIO2, SCL -> GPIO3, RST -> GPIO23 (configurable),
 3.3 V, GND, 32.768 kHz crystal on the module. SEN low = I2C address 0x11, high = 0x63.
 """
 import threading

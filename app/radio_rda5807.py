@@ -4,7 +4,7 @@ Uses the chip's random-access I2C address 0x11 (16-bit registers, MSB first).
 Audio comes from the chip's LOUT/ROUT pins into a small amplifier and speaker,
 or straight into headphones; the Pi does no audio work.
 
-Wiring (Pi Zero 2 W): SDA -> GPIO2, SCL -> GPIO3, VCC 3.3 V, GND.
+Wiring (Raspberry Pi): SDA -> GPIO2, SCL -> GPIO3, VCC 3.3 V, GND.
 Antenna: ~75 cm wire on the ANT pin (or the headphone cable via a small cap).
 """
 import threading

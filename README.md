@@ -1,6 +1,6 @@
 # Pocket Survival Computer: software
 
-Offline software for a Raspberry Pi Zero 2 W pocket computer with a 3.5" touchscreen.
+Offline software for a Raspberry Pi 3 Model B+ pocket computer (1 GB RAM) with a 3.5" touchscreen.
 No internet needed after setup.
 
 | Tab | What it does |
@@ -77,6 +77,8 @@ python3 tools/build_imagery.py data/map.mbtiles --source pdok --around 52.09,5.1
 Add `--dry-run` to see the tile count and size first. Blue Marble (NASA) is public domain; Sentinel-2 cloudless (EOX) is non-commercial only; PDOK aerial photos are Dutch open data. Google/Bing/Esri imagery may not be downloaded for offline use.
 
 ## 1c. Offline Wikipedia, WikiMed, Khan Academy (optional, on your PC)
+
+Khan Academy courses are played through **Kolibri**, which needs about 1 GB of RAM. The Raspberry Pi 3 Model B+ (1 GB) is the target board for this. Use the Kiwix libraries for offline reading and Kolibri for lessons.
 Download `.zim` files from https://library.kiwix.org (or https://download.kiwix.org/zim/) on your PC and copy them to `data/zim/` on the SD card (or a `zim` folder on a USB stick / the boot partition). They are picked up within a minute and appear in the search automatically. Approximate sizes (2026):
 
 | File | Size |
@@ -88,7 +90,7 @@ Download `.zim` files from https://library.kiwix.org (or https://download.kiwix.
 | `mdwiki_en_all_maxi` (WikiMed medical encyclopedia) | ~2–4 GB |
 | Wikivoyage, Wikibooks, iFixit, Gutenberg, Khan Academy subsets | 1–15 GB each |
 
-Search for "khan" on library.kiwix.org for Khan Academy collections. Pick what fits: a 256 GB card holds English Wikipedia with pictures plus Dutch and Spanish without pictures and WikiMed. Every official Wikipedia ZIM has a full-text index, so every word is searchable (expect 1–5 s per library on the Pi Zero 2 W).
+Search for "khan" on library.kiwix.org for Khan Academy collections. Pick what fits: a 256 GB card holds English Wikipedia with pictures plus Dutch and Spanish without pictures and WikiMed. Every official Wikipedia ZIM has a full-text index, so every word is searchable (expect 1–5 s per library on the Pi 3 B+).
 
 **Videos** (e.g. Khan Academy downloads): put them in `data/videos/<Subject>/`, `.mp4` or `.webm`, at 360p/480p to save space. A subtitle file with the same name (`.vtt`/`.srt`) makes everything said in the video searchable. Sound needs an audio output (I2S amp board or USB sound stick): the Pi Zero has none built in.
 
@@ -122,21 +124,23 @@ The app runs as the `doomsday` systemd service on port 8080 and Chromium shows i
 | White LED / red LED | MOSFET gates on GPIO12 (pin 32) / GPIO13 (pin 33), with a gate resistor and pull-down |
 | MPU-6050 (GY-521) | same I2C bus, 3.3 V, **AD0 → 3.3 V** (address 0x69; the DS3231 has 0x68). Mount it firmly in the case |
 | DS3231 clock | same I2C bus, 3.3 V |
-| RTL-SDR stick + USB sound stick | on the powered/OTG USB hub in the Zero's data port |
+| RTL-SDR stick + USB sound stick | plugged straight into two of the Pi's USB-A ports (the 4-port hub is no longer needed) |
 
 Check with `i2cdetect -y 1` (expect 11 Si4732, 76 BME280, 0d compass, 43 UPS HAT, 68 DS3231 shown as UU once its driver loads, 69 MPU-6050), `arecord -l` (sound stick), `rtl_test -t` (SDR stick) and `cgps` (GPS).
 
 Keep the BME280 away from the Pi CPU (on a short cable or outside the case), or the temperature reads several degrees high. Pressure (the forecast) is unaffected.
 
 ## Weather fax and RTTY
-The installer downloads the Si4732 SSB patch once (`tools/get_ssb_patch.py`; it comes from the PU2CLR SI4735 library and is for personal, non-commercial use, so it is not part of this package). Without it FM/AM/SW still work and the fax section says what is missing. A reception tunes the radio to USB about 1.9 kHz below the station's listed frequency, records the sound stick at 8 kHz, puts the radio back, then decodes in a low-priority process (about a minute for a 12-minute chart on the Zero 2 W). The fax decoder finds the exact tone frequency by itself (radio crystals are often a few hundred Hz off on shortwave) and corrects sound-card clock drift (slant). Results are in `data/shortwave/` and can be downloaded over the hotspot. The station list (`app/shortwave.py`) and frequencies need checking against current schedules; add daily times on the device.
+The installer downloads the Si4732 SSB patch once (`tools/get_ssb_patch.py`; it comes from the PU2CLR SI4735 library and is for personal, non-commercial use, so it is not part of this package). Without it FM/AM/SW still work and the fax section says what is missing. A reception tunes the radio to USB about 1.9 kHz below the station's listed frequency, records the sound stick at 8 kHz, puts the radio back, then decodes in a low-priority process (about a minute for a 12-minute chart on the Pi 3 B+). The fax decoder finds the exact tone frequency by itself (radio crystals are often a few hundred Hz off on shortwave) and corrects sound-card clock drift (slant). Results are in `data/shortwave/` and can be downloaded over the hotspot. The station list (`app/shortwave.py`) and frequencies need checking against current schedules; add daily times on the device.
 
 
 **No GPS fix: dead reckoning** (`app/deadreck.py`). An MPU-6050 accelerometer (GY-521; MPU-6500/9250 clones accepted, at 0x69 with AD0 high because the DS3231 clock uses 0x68) counts steps; each step moves the estimate one step length (learned from GPS) along the compass heading. In Boat mode the estimate continues with the last GPS speed and course, or a speed and course typed in. It restarts from every GPS fix and from coordinates you type (Go tab, "Enter coordinates": decimal, degrees + decimal minutes, DMS or UTM) or set on the map ("I am here"). The map shows it as an orange dot with an error circle (on foot 10 m + 5% of distance; boat 50 m + 10% + drift). Estimated points are added to the track.
 
-**Messages (Meshtastic):** plug a Meshtastic node (Heltec or LilyGO LoRa board) into the USB hub. The ⇄ tab's "Messages" section lists messages and nearby nodes, sends short text (on-screen keyboard), and shares your position. Needs `pip install meshtastic`. Untested with real nodes.
+**Messages (Meshtastic):** plug a Meshtastic node (Heltec or LilyGO LoRa board) into a USB port of the Pi. The ⇄ tab's "Messages" section lists messages and nearby nodes, sends short text (on-screen keyboard), and shares your position. Needs `pip install meshtastic`. Untested with real nodes.
 
-**Other boards:** the Pi is the default. See [docs/boards.md](docs/boards.md) for what a Radxa Zero 3W would need. Not tested.
+**Board:** Raspberry Pi 3 Model B+ (1 GB), the default. Its UPS HAT (D) wakes the Pi with I2C; the battery readout works at 0x43. Optional: set the HAT's auto power-on by writing 0x55 to register 0x01 of its MCU at 0x2D (`i2cset -y 1 0x2d 0x01 0x55`), so it starts when charging. Untested.
+
+**Other boards:** See [docs/boards.md](docs/boards.md) for what a Radxa Zero 3W would need. Not tested.
 
 **Clock:** a DS3231 clock chip keeps time while off (`dtoverlay=i2c-rtc,ds3231`); GPS time and a computer on the hotspot correct it, or tap the clock on screen.
 

@@ -474,7 +474,7 @@ async function airRefresh() {
   AIR.data = d;
   $("#air-off").classList.toggle("hidden", d.ready);
   $("#air-off").innerHTML = d.ready ? "" : "<b>Airband receiver not ready.</b> " + esc(d.reason || "") +
-    "<br>Needs the SDR stick with its antenna, on the USB hub. See the guide page <i>Listening to aircraft</i>.";
+    "<br>Needs the SDR stick with its antenna, in one of the Pi's USB ports. See the guide page <i>Listening to aircraft</i>.";
   $("#air-on").classList.toggle("hidden", !d.ready);
   const L = d.listening;
   $("#air-now").classList.toggle("hidden", !L);
@@ -531,7 +531,7 @@ async function meshRefresh() {
   $("#mesh-off").classList.toggle("hidden", d.available);
   $("#mesh-on").classList.toggle("hidden", !d.available);
   $("#mesh-off").innerHTML = "<b>No message radio.</b> " + esc(d.error || "") +
-    "<br>Plug a Meshtastic node (Heltec or LilyGO LoRa board) into the USB hub.";
+    "<br>Plug a Meshtastic node (Heltec or LilyGO LoRa board) into a USB port of the Pi.";
   if (!d.available) return;
   $("#mesh-msgs").innerHTML = d.messages.slice().reverse().map(m => `<div class="item"><div class="grow">
     <div class="name">${m.out ? "Me" : esc(m.from)}</div><div>${esc(m.text)}</div>
