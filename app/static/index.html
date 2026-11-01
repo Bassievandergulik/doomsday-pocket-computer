@@ -51,8 +51,13 @@
       <div id="dr-info"></div>
       <div class="row"><button id="dr-enter">Enter coordinates</button></div>
       <div class="row"><span>Without GPS</span><div id="dr-mode" class="chips" style="flex:1;margin:0">
-        <button data-m="foot">On foot</button><button data-m="boat">Boat</button><button data-m="off">Off</button></div></div>
+        <button data-m="foot">On foot</button><button data-m="boat">Boat</button><button data-m="vehicle">Car/bike/plane</button><button data-m="off">Off</button></div></div>
       <div class="row hidden" id="dr-boat-row"><button id="dr-boat">Boat speed and course...</button></div>
+    </div>
+    <div class="card small" id="ins-card">
+      <div id="ins-info"></div>
+      <div class="row"><button id="ins-align">Align (hold still)</button><button id="ins-heading">Set heading...</button>
+        <button id="ins-trust" class="hidden">Trust GPS</button></div>
     </div>
     <h3>Waypoints</h3>
     <div id="wp-list" class="list"></div>

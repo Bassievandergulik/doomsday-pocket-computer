@@ -13,7 +13,8 @@ body { display: flex; flex-direction: column; }
   background: var(--card); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; }
 #st-clock { margin-left: auto; }
 #st-bat.low { color: var(--bad); font-weight: 700; }
-#st-gps.fix { color: var(--ok); } #st-gps.nofix { color: var(--bad); }
+#st-gps.fix { color: var(--ok); } #st-gps.nofix { color: var(--bad); } #st-gps.spoof { color: var(--bad); font-weight: bold; }
+#ins-info .warn { color: var(--bad); font-weight: bold; }
 main { flex: 1; position: relative; overflow: hidden; }
 .page { display: none; position: absolute; inset: 0; overflow-y: auto; padding: 8px; }
 .page.active { display: block; }

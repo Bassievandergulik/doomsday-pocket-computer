@@ -39,7 +39,8 @@ app/hotspot.py       direct WiFi hotspot (NetworkManager)
 app/exports.py       uploads and downloads for the computer (GPX, CSV, backup)
 app/shortwave.py     weather fax / RTTY receptions: stations, schedule, recording, decoding
 app/audio.py         USB sound stick capture (arecord)
-app/deadreck.py      MPU-6050 step counter + dead reckoning (on foot / boat)
+app/deadreck.py      MPU-6050 / ICM-42688-P step counter + dead reckoning (on foot / boat)
+app/ins.py           IRS-style inertial heading (alignment, Kalman filter) + GPS spoof checks
 app/airband.py       VHF airband listening and scanning via rtl_fm
 app/wefax.py, rtty.py  weather fax and RTTY decoders (numpy)
 tools/get_ssb_patch.py downloads the Si4732 SSB patch once (not included: not ours to distribute)
@@ -120,7 +121,7 @@ The app runs as the `doomsday` systemd service on port 8080 and Chromium shows i
 | GPS (u-blox NEO-6M/M8N) TX → RX | GPIO15 (pin 10); GPS RX ← GPIO14 (pin 8); or use a USB GPS |
 
 | White LED / red LED | MOSFET gates on GPIO12 (pin 32) / GPIO13 (pin 33), with a gate resistor and pull-down |
-| MPU-6050 (GY-521) | same I2C bus, 3.3 V, **AD0 → 3.3 V** (address 0x69; the DS3231 has 0x68). Mount it firmly in the case |
+| ICM-42688-P (recommended) or MPU-6050 (GY-521) | same I2C bus, 3.3 V, **AD0 → 3.3 V** (address 0x69; the DS3231 has 0x68). Mount it firmly in the case, flat, chip X axis towards the top of the device (otherwise set `ins_mount`) |
 | DS3231 clock | same I2C bus, 3.3 V |
 | RTL-SDR stick + USB sound stick | on the powered/OTG USB hub in the Zero's data port |
 
@@ -133,6 +134,16 @@ The installer downloads the Si4732 SSB patch once (`tools/get_ssb_patch.py`; it 
 
 
 **No GPS fix: dead reckoning** (`app/deadreck.py`). An MPU-6050 accelerometer (GY-521; MPU-6500/9250 clones accepted, at 0x69 with AD0 high because the DS3231 clock uses 0x68) counts steps; each step moves the estimate one step length (learned from GPS) along the compass heading. In Boat mode the estimate continues with the last GPS speed and course, or a speed and course typed in. It restarts from every GPS fix and from coordinates you type (Go tab, "Enter coordinates": decimal, degrees + decimal minutes, DMS or UTM) or set on the map ("I am here"). The map shows it as an orange dot with an error circle (on foot 10 m + 5% of distance; boat 50 m + 10% + drift). Estimated points are added to the track.
+
+**Inertial navigation (INS) and GPS spoof checks** (`app/ins.py`). Works like an aircraft IRS, scaled down to a MEMS chip. The chip is the **ICM-42688-P** (about EUR 12, 5 to 10 times quieter than the MPU-6050; the MPU-6050 still works, just rougher). It does not integrate acceleration into position (that is kilometres off within minutes, even a EUR 300 chip). What it does:
+
+1. **Align**: hold the device still for 30 s (on a boat, in Boat mode: 60 s, rocking is fine). It measures the gyro zero offset, takes "up" from gravity and north from the compass. The Go tab shows `ALIGN 40%`, then `NAV`. Press *Align* to redo it.
+2. **Gyro-stabilised heading**: a small Kalman filter (heading plus gyro bias) trusts the gyro in the short term and the compass and GPS course slowly in the long term. A rolling boat, a heeled device or a magnet nearby barely moves it. This heading replaces the raw compass everywhere (map arrow, dead reckoning). In Boat mode the estimate also follows every turn the gyro feels after GPS is lost.
+3. **Spoof checks**: every new GPS fix is compared with what the sensors felt: a position jump, a position that does not match its own speed, a speed or direction change with no push on the accelerometer, a course change the gyro did not feel, steps counted while GPS says you stand still. Two points of evidence make the GPS *suspect*: the status bar says `GPS SUSPECT`, the fix is ignored and the position comes from dead reckoning, anchored on the last trusted fix. It returns by itself after 5 quiet minutes if GPS agrees with the estimate again, or press *Trust GPS* (30 minutes). `ins_spoof_action: "warn"` only warns and keeps using GPS.
+
+**In a car, plane or on a bike** choose *Car/bike/plane* under "Without GPS". Alignment then tolerates vibration and movement, the estimate carries on with the last GPS speed and course (or a speed in km/h you type) turned by the gyro, the jump limit rises to 320 m/s for aircraft, and GPS course is no longer used to correct the heading, because the device may sit at any angle to the direction of travel. In a banked turn the gyro sees about 10% less turn than there is (at 25 deg bank). Speed changes in traffic are not measured, so the estimate's error grows with 20% of the distance.
+
+Honest limits: a spoofer who drags the position slowly at a steady speed feels like normal motion and is only caught once it exceeds the dead-reckoning error; with no GPS at all, position still comes from speed times heading (nothing affordable measures speed through the water or the current), so after an hour at sea expect kilometres, not metres. A real INS (ring-laser gyros) drifts 0.01 deg/h, the ICM-42688-P roughly 10 to 50 deg/h. Not done: a clock cross-check against the DS3231 and GPS signal-strength checks. Power: the chip draws about 1 mA and the filter a few percent of one core. Settings in `config.json`: `ins_enabled`, `ins_mount`, `ins_spoof_action`, `ins_compass_sigma`, `ins_max_speed_ms`. All of it is tested on simulated sensors only (`tests/test_ins.py`), never on a real chip or a real spoofer.
 
 **Messages (Meshtastic):** plug a Meshtastic node (Heltec or LilyGO LoRa board) into the USB hub. The ⇄ tab's "Messages" section lists messages and nearby nodes, sends short text (on-screen keyboard), and shares your position. Needs `pip install meshtastic`. Untested with real nodes.
 

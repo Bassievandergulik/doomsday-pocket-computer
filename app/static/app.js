@@ -127,15 +127,18 @@ function setTarget(t) {
 async function pollGps() {
   try {
     const g = await api("/api/gps");
-    const ok = g.mode >= 2 && g.lat != null && !g.stale;
+    const ok = g.mode >= 2 && g.lat != null && !g.stale && !g.gps_suspect;
     S.fix = ok ? g : null;
+    S.ins = g.ins || null;
+    const suspect = !!g.gps_suspect;
+    if (S.page === "go") insRender(S.ins);
     S.heading = g.heading;
     S.gpsRaw = g;
     S.manual = g.manual_pos || null;
     S.dr = ok ? null : (g.dr || null);
     const st = $("#st-gps");
-    st.className = ok ? "fix" : (S.dr || S.manual ? "" : "nofix");
-    st.textContent = ok ? `GPS ${g.mode}D ${g.sats ?? ""}sat`
+    st.className = suspect ? "spoof" : ok ? "fix" : (S.dr || S.manual ? "" : "nofix");
+    st.textContent = suspect ? `GPS SUSPECT${S.dr ? " · INS ±" + fmtDist(S.dr.err_m) : ""}` : ok ? `GPS ${g.mode}D ${g.sats ?? ""}sat`
       : S.dr ? `Estimated ±${fmtDist(S.dr.err_m)}` : (S.manual ? "Position set by hand" : (g.source === "none" ? "No position" : "GPS searching"));
     const p = myPos();
     $("#st-pos").textContent = p ? p.lat.toFixed(5) + ", " + p.lon.toFixed(5) : "";
@@ -285,13 +288,44 @@ async function drRefresh() {
   const d = await api("/api/dr");
   S.drStatus = d;
   document.querySelectorAll("#dr-mode button").forEach(b => b.classList.toggle("on", b.dataset.m === d.mode));
-  $("#dr-boat-row").classList.toggle("hidden", d.mode !== "boat");
+  const veh = d.mode === "vehicle";
+  $("#dr-boat-row").classList.toggle("hidden", d.mode !== "boat" && !veh);
   const b = d.boat;
-  $("#dr-boat").textContent = b && b.speed_kn != null ? `Boat: ${b.speed_kn} kn, course ${b.course != null ? b.course + "°" : "from compass"} (change)` : "Boat: using last GPS speed and course (set by hand...)";
+  const what = veh ? "Vehicle" : "Boat";
+  $("#dr-boat").textContent = b && b.speed_kn != null
+    ? `${what}: ${veh ? Math.round(b.speed_kn * 1.852) + " km/h" : b.speed_kn + " kn"}, course ${b.course != null ? b.course + "°" : "from compass"} (change)`
+    : `${what}: using last GPS speed and course, turned by the gyro (set by hand...)`;
+  insRefresh();
   $("#dr-info").textContent = (d.imu ? `Step counter: ${d.imu}, ${d.steps} steps, step length ${Math.round(d.step_len * 100)} cm (learns from GPS). `
     : "No step sensor found: on foot the estimate cannot move by itself. ") +
     "When GPS stops, the position is estimated from here on. Enter coordinates (from a chart, a sign, or a GPS that works) to correct it.";
 }
+async function insRefresh() { insRender(S.ins = await api("/api/ins")); }
+function insRender(i) {
+  if (!i) return;
+  const card = $("#ins-card");
+  card.classList.toggle("hidden", !i.available);
+  if (!i.available) return;
+  const stateTxt = i.state === "align" ? `ALIGN ${i.align_pct}%: keep the device still${i.sea ? " (moving is fine)" : ""}`
+    : i.state === "nav-degraded" ? "NAV (not fully aligned)" : "NAV";
+  let html = `<b>Inertial navigation ${stateTxt}</b> · ${i.model}`;
+  if (i.heading != null) html += `<br>Gyro heading ${Math.round(i.heading)}° ±${Math.max(1, Math.round(i.heading_sigma))}° · turning ${i.turn_dps.toFixed(1)}°/s`;
+  if (i.gps === "suspect") html += `<br><span class="warn">GPS looks spoofed: ${esc(i.reasons.join("; "))}. The position now comes from the inertial estimate.</span>`;
+  else if (i.gps === "trusted-by-hand") html += `<br>GPS trusted by hand.`;
+  else if (i.notes.length) html += `<br>Note: ${esc(i.notes.join("; "))}`;
+  $("#ins-info").innerHTML = html;
+  $("#ins-trust").classList.toggle("hidden", i.gps !== "suspect");
+}
+$("#ins-align").onclick = async () => { await api("/api/ins", { action: "realign" }); toast("Keep the device still until ALIGN reaches 100%"); insRefresh(); };
+$("#ins-trust").onclick = async () => {
+  if (!(await askConfirm("Trust the GPS again for 30 minutes? Only do this if you are sure the position is real."))) return;
+  await api("/api/ins", { action: "trust_gps" }); insRefresh(); pollGps();
+};
+$("#ins-heading").onclick = async () => {
+  const v = await askText("Heading in degrees from your steering compass or the sun (0-359)", "");
+  if (v === null || isNaN(Number(v)) || !v.trim()) return;
+  await api("/api/ins", { action: "heading", deg: ((Number(v) % 360) + 360) % 360 }); insRefresh();
+};
 $("#dr-enter").onclick = async () => {
   const p = myPos();
   const v = await askText("Your position: 52.3702 4.8952 · 52 22.2 N 4 53.7 E · 31U 629025 5803904", p ? p.lat.toFixed(5) + " " + p.lon.toFixed(5) : "");
@@ -307,12 +341,15 @@ $("#dr-mode").onclick = async (e) => {
 };
 $("#dr-boat").onclick = async () => {
   const b = (S.drStatus && S.drStatus.boat) || {};
-  const v = await askText("Boat speed in knots and course in degrees (e.g. 5.5 230). Course empty = use the compass. Empty = last GPS speed and course.",
-    b.speed_kn != null ? `${b.speed_kn} ${b.course ?? ""}`.trim() : "");
+  const veh = S.drStatus && S.drStatus.mode === "vehicle";
+  const unit = veh ? 1.852 : 1;  // vehicles: km/h, boats: knots
+  const v = await askText(veh ? "Speed in km/h and course in degrees (e.g. 80 230). Course empty = use the compass. Empty = last GPS speed and course."
+    : "Boat speed in knots and course in degrees (e.g. 5.5 230). Course empty = use the compass. Empty = last GPS speed and course.",
+    b.speed_kn != null ? `${Math.round(b.speed_kn * unit * 10) / 10} ${b.course ?? ""}`.trim() : "");
   if (v === null) return;
   const n = v.trim().split(/[\s,]+/).filter(Boolean).map(Number);
   if (n.some(isNaN) || n.length > 2) return toast("Type a speed and a course, e.g. 5.5 230");
-  await api("/api/dr", { mode: "boat", speed_kn: n.length ? n[0] : null, course: n.length > 1 ? n[1] % 360 : null });
+  await api("/api/dr", { mode: veh ? "vehicle" : "boat", speed_kn: n.length ? n[0] / unit : null, course: n.length > 1 ? n[1] % 360 : null });
   drRefresh();
 };
 $("#go-clear").onclick = () => setTarget(null);
