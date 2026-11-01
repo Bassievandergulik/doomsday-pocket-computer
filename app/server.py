@@ -58,6 +58,7 @@ DEFAULT_CONFIG = {
     "sw_capture_volume": 45,            # radio volume (0-63) while recording a fax / RTTY
     "sw_keep_audio": False,
     "airband_gain": 40,
+    "airband_ppm": 0,                   # RTL-SDR frequency correction in ppm (measure with a known station; cheap sticks drift)
     "meshtastic_port": "auto",          # USB serial port of a Meshtastic node, or "auto"
     "board": "pi",                      # "pi" (Raspberry Pi 3 B+); see docs/boards.md for alternatives
     "light_white_gpio": 12,             # MOSFET gate of the 1 W white LED (PWM pin)
@@ -108,6 +109,11 @@ class App:
         cal = self.get_setting("compass_cal")
         self.compass = sensors.Compass(bus, calibration=cal, declination=self.config["magnetic_declination"])
         self.bme = sensors.BME280(bus)
+        if not self.bme.available:  # the BME680 replaces the BME280 in the parts list
+            bme680 = sensors.BME680(bus)
+            if bme680.available:
+                self.bme = bme680
+        self.uv = sensors.UVSensor(bus)
         self.battery = sensors.Battery(bus)
         self.imu = deadreck.IMU(bus)
         self.battery_state = {"available": self.battery.available}
@@ -158,7 +164,7 @@ class App:
         self.mesh.start()
         self.light = light_mod.Light(self.config["light_white_gpio"], self.config["light_red_gpio"])
         self.airband = airband_mod.Airband(self.get_setting, self.set_setting, self.config["audio_device"],
-                                           self.config["airband_gain"])
+                                           self.config["airband_gain"], self.config["airband_ppm"])
         self._seed_presets()
 
     def _clock_from_gps(self):
@@ -413,6 +419,7 @@ class App:
             "sun": sun, "nav_db": meta, "raster": self.mbtiles() is not None,
             "raster_attribution": self._raster_attribution(),
             "radio": self.radio.available, "weather_sensor": self.bme.available,
+            "uv": self.uv.available, "uv_index": self.uv.index() if self.uv.available else None,
             "compass": self.compass.available, "start_view": self.config["start_view"],
             "track_km": round(track_length_m(self.gps.track) / 1000, 2),
             "battery": self.battery_state, "manual_pos": self.get_setting("manual_pos"),
@@ -635,6 +642,10 @@ class Handler(BaseHTTPRequestHandler):
                 pos = app.position()
                 rep = app.weather.report(latitude=pos[0] if pos else None)
                 rep["history"] = [[r[0], r[1], r[2]] for r in app.weather.history(48)[::3]]
+                rep["uv_index"] = app.uv.index() if app.uv.available else None
+                last = getattr(app.bme, "last", None)
+                rep["air_quality"] = (last or {}).get("air_quality")
+                rep["gas_ohm"] = (last or {}).get("gas_ohm")
                 return self._send(200, rep)
             if p == "/api/forecast":
                 return self._send(200, dict(app.forecast.report(), enabled=app.config["forecast_auto_download"]))

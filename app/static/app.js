@@ -610,9 +610,15 @@ async function loadWeather() {
   if (w.temp_c == null) { $("#wx-fc").textContent = w.message; return; }
   const tr = w.trend_hpa_3h;
   const arrow = tr == null ? "" : tr <= -1.6 ? " ↓" : tr >= 1.6 ? " ↑" : " →";
+  const uv = w.uv_index;
+  const uvTxt = uv == null ? null : uv.toFixed(1) + (uv >= 6 ? " burn" : uv >= 3 ? " cover up" : "");
+  $("#wx-uv").innerHTML = uv != null && uv >= 3
+    ? `<div class="warn">UV index ${uv.toFixed(1)}: ${uv >= 8 ? "very high, sunburn in minutes. Stay in shade, cover skin and eyes." : "high, sunburn in under 30 minutes. Cover up and use shade."}</div>` : "";
   $("#wx-now").innerHTML = [
     ["Temp", w.temp_c + "°C"], ["Humidity", w.humidity != null ? Math.round(w.humidity) + "%" : "--"],
     ["Pressure", Math.round(w.pressure_msl_hpa) + arrow], ["Dew pt", w.dew_point_c != null ? w.dew_point_c + "°" : "--"],
+    ...(uvTxt ? [["UV index", uvTxt]] : []),
+    ...(w.air_quality != null ? [["Air", w.air_quality >= 70 ? "clean" : w.air_quality >= 40 ? "fair" : "poor"]] : []),
   ].map(x => `<div class="card"><div class="small">${x[0]}</div><div class="v">${x[1]}</div></div>`).join("");
   $("#wx-fc").innerHTML = esc(w.forecast) + (tr != null ? `<div class="small">Pressure ${tr > 0 ? "+" : ""}${tr} hPa in 3 h (sea level, alt ${Math.round(w.altitude_m)} m)</div>` : "");
   $("#wx-warn").innerHTML = (w.warnings || []).map(x => `<div class="warn">${esc(x)}</div>`).join("");

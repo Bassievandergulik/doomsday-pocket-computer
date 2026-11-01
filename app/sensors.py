@@ -22,6 +22,100 @@ def open_bus(bus=1):
         return None
 
 
+class BME680:
+    """Bosch BME680: temperature, pressure, humidity and gas resistance (air quality).
+
+    Uses Pimoroni's `bme680` package (pip install bme680), which already does Bosch's
+    compensation maths. Address 0x76 or 0x77 (depends on the board's SDO pin).
+    Gas resistance is the air-quality signal: it drops when smoke, fumes or many
+    volatile organics are present, after a 5-minute warm-up. Untested on hardware.
+    """
+
+    def __init__(self, bus, addresses=(0x76, 0x77)):
+        self.available = False
+        self.gas_baseline = None
+        self.last = None
+        self.dev = None
+        self.error = None
+        try:
+            import bme680 as lib
+        except ImportError:
+            self.error = "bme680 package not installed (pip install bme680)"
+            return
+        if bus is None:
+            return
+        for a in addresses:
+            try:
+                self.dev = lib.BME680(i2c_addr=a, i2c_device=bus)
+                break
+            except (OSError, RuntimeError, IOError):
+                self.dev = None
+        if self.dev is None:
+            return
+        d = self.dev
+        d.set_humidity_oversample(lib.OS_2X)
+        d.set_pressure_oversample(lib.OS_4X)
+        d.set_temperature_oversample(lib.OS_8X)
+        d.set_filter(lib.FILTER_SIZE_3)
+        d.set_gas_status(lib.ENABLE_GAS_MEAS)
+        d.set_gas_heater_temperature(320)
+        d.set_gas_heater_duration(150)
+        d.select_gas_heater_profile(0)
+        self.lib = lib
+        self.started = time.time()
+        self.available = True
+
+    def read(self):
+        """dict(temp_c, pressure_hpa, humidity, gas_ohm, air_quality 0-100 or None) or None."""
+        if not self.available:
+            return None
+        if not self.dev.get_sensor_data():
+            return None
+        d = self.dev.data
+        out = {"temp_c": round(d.temperature, 2), "pressure_hpa": round(d.pressure, 2),
+               "humidity": round(d.humidity, 1), "gas_ohm": None, "air_quality": None}
+        if d.heat_stable:
+            g = d.gas_resistance
+            out["gas_ohm"] = int(g)
+            # baseline = the highest resistance seen in clean air (learned while it warms up)
+            if time.time() - self.started > 300:
+                self.gas_baseline = max(self.gas_baseline or 0, g)
+                out["air_quality"] = round(max(0.0, min(100.0, 100.0 * g / self.gas_baseline)), 0) \
+                    if self.gas_baseline else None
+        self.last = out
+        return out
+
+
+class UVSensor:
+    """LTR390 UV index sensor (I2C 0x53). The index is approximate: calibrated for
+    the common gain setting, not against a reference meter. Untested on hardware."""
+
+    ADDR = 0x53
+
+    def __init__(self, bus):
+        self.bus = bus
+        self.available = False
+        if bus is None:
+            return
+        try:
+            if bus.read_byte_data(self.ADDR, 0x06) != 0xB2:  # part ID
+                return
+            bus.write_byte_data(self.ADDR, 0x00, 0x0A)  # UVS mode, enabled
+            bus.write_byte_data(self.ADDR, 0x05, 0x03)  # gain x18
+            bus.write_byte_data(self.ADDR, 0x04, 0x20)  # 18-bit, 100 ms
+            self.available = True
+        except OSError:
+            pass
+
+    def index(self):
+        """UV index (0 at night), or None."""
+        if not self.available:
+            return None
+        d = self.bus.read_i2c_block_data(self.ADDR, 0x10, 3)
+        raw = d[0] | (d[1] << 8) | (d[2] << 16)
+        return round(raw / 2300.0, 1)  # approximate counts per UV index unit at x18 gain
+
+
 class BME280:
     """Bosch BME280 temperature / humidity / pressure sensor (address 0x76 or 0x77)."""
 

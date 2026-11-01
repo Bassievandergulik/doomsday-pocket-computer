@@ -142,6 +142,8 @@ The installer downloads the Si4732 SSB patch once (`tools/get_ssb_patch.py`; it 
 
 **Other boards:** See [docs/boards.md](docs/boards.md) for what a Radxa Zero 3W would need. Not tested.
 
+**Air and UV (weather tab):** a BME680 (I2C 0x76/0x77) gives pressure, temperature, humidity and a gas reading. The air quality is relative to the cleanest air seen after 5 minutes of warm-up, so it shows *change* (smoke, fumes), not an absolute level. Needs `pip install bme680`. An LTR390 (I2C 0x53) gives a UV index with a sunburn warning; it's calibrated approximately. Both untested on hardware.
+
 **Clock:** a DS3231 clock chip keeps time while off (`dtoverlay=i2c-rtc,ds3231`); GPS time and a computer on the hotspot correct it, or tap the clock on screen.
 
 ## Configuration
@@ -156,6 +158,7 @@ The installer downloads the Si4732 SSB patch once (`tools/get_ssb_patch.py`; it 
 | `ssb_patch` | SSB patch file in the data folder (`ssb_patch.bin`, made by `tools/get_ssb_patch.py`; the installer fetches it) |
 | `audio_device` | sound stick for fax/RTTY: `auto` or e.g. `plughw:1,0` |
 | `airband_gain` | RTL-SDR tuner gain in dB (default 40) |
+| `airband_ppm` | RTL-SDR frequency correction in ppm (default 0). Generic RTL2832U + R820T2 sticks can drift tens of ppm: tune a known station (e.g. an airport ATIS) and adjust until it's clear |
 | `sw_capture_volume`, `sw_keep_audio` | radio volume while recording (0–63; lower it if charts look smeared, raise it if the sound level bar stays low) and whether to keep the WAV files |
 | `gps_serial`, `gps_baud` | if not using gpsd |
 | `start_view` | `[lat, lon, zoom]` shown before a GPS fix (and the forecast location without GPS) |

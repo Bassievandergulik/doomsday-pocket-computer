@@ -448,6 +448,27 @@ class MeshTest(unittest.TestCase):
             m2.send_text("hi")  # no node connected
 
 
+class AirAndUvTest(unittest.TestCase):
+    def test_uv_index_from_fake_ltr390(self):
+        import sensors
+
+        class Bus:
+            regs = {0x06: 0xB2}
+            def read_byte_data(self, a, r): return self.regs[r]
+            def write_byte_data(self, a, r, v): pass
+            def read_i2c_block_data(self, a, r, n): return [0x40, 0x0D, 0x03]  # raw 0x030D40
+        uv = sensors.UVSensor(Bus())
+        self.assertTrue(uv.available)
+        self.assertAlmostEqual(uv.index(), round(0x030D40 / 2300.0, 1))
+        self.assertFalse(sensors.UVSensor(None).available)
+
+    def test_bme680_absent_is_harmless(self):
+        import sensors
+        s = sensors.BME680(None)
+        self.assertFalse(s.available)
+        self.assertIsNone(s.read())
+
+
 class FakeRdaBus:
     """Pretends to be an RDA5807M: 16-bit registers, tune/seek complete at once."""
 

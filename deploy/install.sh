@@ -7,7 +7,7 @@ USER_NAME="$(whoami)"
 
 echo "== Packages"
 sudo apt-get update
-sudo apt-get install -y python3 python3-smbus2 python3-serial python3-lgpio python3-numpy gpsd gpsd-clients \
+sudo apt-get install -y python3 python3-smbus2 python3-serial python3-lgpio python3-numpy python3-bme680 gpsd gpsd-clients \
     i2c-tools cage curl network-manager alsa-utils fake-hwclock
 sudo apt-get install -y chromium || sudo apt-get install -y chromium-browser
 

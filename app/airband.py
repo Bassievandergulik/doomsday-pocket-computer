@@ -36,10 +36,11 @@ def dongle_present():
 
 
 class Airband:
-    def __init__(self, get_setting, set_setting, audio_out="auto", gain=40):
+    def __init__(self, get_setting, set_setting, audio_out="auto", gain=40, ppm=0):
         self._get, self._set = get_setting, set_setting
         self.audio_out = audio_out
         self.gain = gain
+        self.ppm = ppm  # frequency correction; generic RTL-SDR sticks can be tens of ppm off
         self.procs = []
         self.lock = threading.Lock()
         self.listening = None   # {"freqs": [...], "squelch": "..."}
@@ -81,7 +82,8 @@ class Airband:
         if len(mhz_list) > 1 and squelch == "off":
             squelch = "low"  # scanning needs the squelch to know when a channel is busy
         self.stop()
-        cmd = ["rtl_fm", "-M", "am", "-s", str(RATE), "-g", str(self.gain), "-l", str(SQUELCH.get(squelch, 50))]
+        cmd = ["rtl_fm", "-M", "am", "-s", str(RATE), "-g", str(self.gain), "-l", str(SQUELCH.get(squelch, 50)),
+               "-p", str(int(self.ppm))]
         for m in mhz_list:
             cmd += ["-f", "%.4fM" % m]
         cmd += ["-"]
