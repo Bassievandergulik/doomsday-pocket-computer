@@ -1,0 +1,38 @@
+# Publishes the phone app (phone/) to GitHub Pages, so a phone can install it once over https.
+# Turn it on in Settings -> Pages -> Source: GitHub Actions.
+name: Phone app to GitHub Pages
+on:
+  push:
+    branches: [main]
+    paths: ["phone/**", ".github/workflows/phone-pages.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test phone/tests/ins.test.mjs
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: phone
+      - id: deployment
+        uses: actions/deploy-pages@v4

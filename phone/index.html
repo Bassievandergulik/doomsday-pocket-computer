@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pocket INS</title>
+<meta name="description" content="Offline inertial navigation with GPS spoof checks, using the phone's own sensors.">
+<meta name="theme-color" content="#0d1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pocket INS">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Pocket INS</h1>
+  <div class="chips">
+    <span id="chip-ins" class="chip">INS off</span>
+    <span id="chip-gps" class="chip">GPS off</span>
+  </div>
+</header>
+
+<section id="start" class="card start">
+  <h2>Before you start</h2>
+  <p>This works fully offline once it is installed. It uses the phone's gyro, accelerometer, compass and GPS.</p>
+  <ol>
+    <li>Let it align: on foot, lay the phone still, screen up, for about 30 seconds. In a vehicle or boat, put it somewhere it stays put for about a minute (moving is fine).</li>
+    <li>Keep the app open: phones pause the sensors when the screen locks, so it keeps the screen on.</li>
+    <li>The heading is the direction the <b>top of the phone</b> points. On foot, hold it pointing the way you go.</li>
+  </ol>
+  <label class="field">How are you travelling?
+    <select id="start-mode">
+      <option value="foot">On foot</option><option value="bike">Bike</option><option value="car">Car, train or bus</option>
+      <option value="boat">Boat</option><option value="plane">Plane</option>
+    </select>
+  </label>
+  <button id="btn-start" class="primary">Start sensors</button>
+  <button id="btn-demo" class="ghost">Try with simulated sensors</button>
+  <p id="start-err" class="err hidden"></p>
+</section>
+
+<main id="main" class="hidden">
+  <section id="alert" class="card alert hidden">
+    <h2>GPS looks wrong</h2>
+    <ul id="alert-reasons"></ul>
+    <p id="alert-action"></p>
+    <button id="btn-trust" class="ghost">Trust GPS for 30 minutes</button>
+  </section>
+
+  <section class="card heading-card">
+    <div class="rose-wrap">
+      <svg id="rose" viewBox="-100 -100 200 200" aria-hidden="true">
+        <g id="rose-dial">
+          <circle r="92" class="ring"/>
+          <g id="ticks"></g>
+          <text y="-66" class="card-n">N</text><text x="68" y="6" class="card-l">E</text>
+          <text y="76" class="card-l">S</text><text x="-68" y="6" class="card-l">W</text>
+          <g id="wp-mark" class="hidden"><path d="M0,-92 L7,-78 L-7,-78 Z" class="wp-arrow"/></g>
+        </g>
+        <path d="M0,-98 L8,-84 L-8,-84 Z" class="lubber"/>
+      </svg>
+      <div class="rose-center">
+        <div id="hdg" class="hdg">---°</div>
+        <div id="hdg-src" class="muted small">no heading yet</div>
+      </div>
+    </div>
+    <div id="align-bar" class="bar hidden"><div id="align-fill"></div><span id="align-text"></span></div>
+    <div class="grid3 small">
+      <div><span class="muted">Turn</span><br><b id="turn">-</b></div>
+      <div><span class="muted">Tilt</span><br><b id="tilt">-</b></div>
+      <div><span class="muted">Compass</span><br><b id="comp">-</b></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Position</h2>
+    <div id="pos" class="pos">waiting for GPS</div>
+    <div id="pos-dec" class="muted small"></div>
+    <div id="pos-src" class="small"></div>
+    <div class="grid3 small">
+      <div><span class="muted">Speed</span><br><b id="spd">-</b></div>
+      <div><span class="muted">Course</span><br><b id="crs">-</b></div>
+      <div><span class="muted">Steps</span><br><b id="steps">0</b></div>
+    </div>
+    <div class="row small"><span class="muted">Trip</span> <b id="trip">0 m</b><span style="flex:1"></span><button id="btn-trip" class="ghost">Reset trip</button></div>
+  </section>
+
+  <section class="card">
+    <h2>Dead reckoning</h2>
+    <div class="seg" id="mode-seg">
+      <button data-mode="foot">On foot</button><button data-mode="bike">Bike</button><button data-mode="car">Car / train</button>
+      <button data-mode="boat">Boat</button><button data-mode="plane">Plane</button><button data-mode="off">Off</button>
+    </div>
+    <p class="muted small" id="mode-help"></p>
+    <div id="boat-box" class="hidden">
+      <div class="row">
+        <input id="boat-speed" type="number" inputmode="decimal" placeholder="Speed (knots)">
+        <input id="boat-course" type="number" inputmode="numeric" placeholder="Course (°)">
+      </div>
+      <button id="btn-boat" class="ghost">Use this speed and course</button>
+      <button id="btn-boat-gps" class="ghost">Use last GPS speed and course</button>
+    </div>
+    <div class="row">
+      <input id="pos-in" type="text" placeholder="I'm here: 52 22.2 N 4 53.4 E" autocomplete="off">
+      <button id="btn-pos" class="ghost">Set</button>
+    </div>
+    <p id="pos-err" class="err hidden"></p>
+  </section>
+
+  <section class="card">
+    <h2>Inertial unit</h2>
+    <div class="row">
+      <button id="btn-realign" class="ghost">Realign (hold still)</button>
+    </div>
+    <div class="row">
+      <input id="hdg-in" type="number" inputmode="numeric" placeholder="Heading from a steering compass (°)">
+      <button id="btn-hdg" class="ghost">Set</button>
+    </div>
+    <p class="muted small" id="ins-detail"></p>
+  </section>
+
+  <section class="card">
+    <h2>Waypoints</h2>
+    <div class="row">
+      <input id="wp-name" type="text" placeholder="Name" autocomplete="off">
+      <button id="btn-wp" class="ghost">Save here</button>
+    </div>
+    <div class="row">
+      <input id="wp-coords" type="text" placeholder="or type coordinates" autocomplete="off">
+      <button id="btn-wp-typed" class="ghost">Add</button>
+    </div>
+    <ul id="wps" class="wps"></ul>
+  </section>
+
+  <section class="card">
+    <h2>Settings</h2>
+    <label class="field">Magnetic variation (° east +, west −)
+      <input id="set-decl" type="number" inputmode="decimal" step="0.1">
+    </label>
+    <p class="muted small">The phone compass points to magnetic north. Look up the variation on a chart or map for your area (the Netherlands is about +2°).</p>
+    <label class="field">Step length (m, learns itself from GPS)
+      <input id="set-step" type="number" inputmode="decimal" step="0.01">
+    </label>
+    <label class="field">When GPS looks wrong
+      <select id="set-action">
+        <option value="switch">Stop using it, carry on by dead reckoning</option>
+        <option value="warn">Only warn me</option>
+      </select>
+    </label>
+    <label class="row"><input type="checkbox" id="set-night"> Red night mode (keeps your night vision)</label>
+    <div class="row">
+      <button id="btn-gpx" class="ghost">Export track (GPX)</button>
+      <button id="btn-clear" class="ghost">Clear track</button>
+    </div>
+    <p class="muted small" id="wake"></p>
+  </section>
+
+  <section class="card muted small">
+    <h2>What this can and cannot do</h2>
+    <p>A phone gyro drifts tens of degrees per hour, so it cannot measure position on its own like an airliner's INS. It keeps a steady heading through turns, rolling and nearby magnets, and checks every GPS fix against what the sensors felt: sudden jumps, speed changes nothing pushed, turns the gyro didn't feel, steps while GPS says you stand still.</p>
+    <p>Position without GPS is speed × course (bike, car, boat, plane) or steps × step length (on foot). It does not know the current, wind or speed changes, so the uncertainty grows over time. A slow, steady drag of the GPS position can look like normal movement and is only caught once it exceeds that uncertainty.</p>
+  </section>
+</main>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
