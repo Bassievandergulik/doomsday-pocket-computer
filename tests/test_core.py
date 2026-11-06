@@ -415,6 +415,33 @@ class LightTest(unittest.TestCase):
         finally:
             light.lgpio = orig
 
+    def test_rgb_led(self):
+        import types
+        import light
+        level = {}
+
+        def pwm(h, p, f, d):
+            level[p] = d
+
+        def write(h, p, v):
+            level[p] = 100 if v else 0
+        fake = types.SimpleNamespace(gpiochip_open=lambda n: 7, gpio_claim_output=lambda h, p, v: None,
+                                     tx_pwm=pwm, gpio_write=write)
+        orig, light.lgpio = light.lgpio, fake
+        try:
+            L = light.Light(12, 13, 16)  # green, red, blue dies
+            self.assertTrue(L.status()["rgb"])
+            L.set("red", True, 30)
+            self.assertEqual((level.get(12, 0), level[13], level.get(16, 0)), (0, 30, 0))  # night light: red die only
+            L.set("white", True, 80)
+            self.assertEqual((level[12], level[13], level[16]), (80, 80, 80))  # torch: all three dies
+            L.set("white", False)
+            self.assertEqual((level[12], level[13], level[16]), (0, 30, 0))  # red stays on
+            L.set("red", False)
+            self.assertEqual(level[13], 0)
+        finally:
+            light.lgpio = orig
+
 
 def m_cos(deg):
     import math

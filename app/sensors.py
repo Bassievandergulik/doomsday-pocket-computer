@@ -207,7 +207,9 @@ class BMM150:
     which needs the factory trim values stored in the chip (registers 0x5D-0x71).
     compensate_xy() is Bosch's floating-point formula from the BMM150 API.
     """
-    ADDRESSES = (0x13, 0x12, 0x11, 0x10)
+    # 0x10 and 0x11 are skipped on purpose: the RDA5807M and Si4732 radios live there,
+    # and the power-up write below would be a command to them.
+    ADDRESSES = (0x13, 0x12)
     CHIP_ID = 0x32
     OVERFLOW_XY = -4096
 
@@ -268,7 +270,7 @@ class BMM150:
 
 
 class Compass:
-    """BMM150 (0x10-0x13), QMC5883L (0x0D) or HMC5883L (0x1E) magnetometer. Hold the device flat.
+    """BMM150 (0x12/0x13), QMC5883L (0x0D) or HMC5883L (0x1E) magnetometer. Hold the device flat.
 
     Calibrate by calling start_calibration(), turning the device through a few
     full circles, then finish_calibration(). Offsets are returned so they can be saved.

@@ -13,7 +13,7 @@ Next steps, other boards and add-ons: https://claude.ai/artifact/UgNt2oEdvyDaBiR
 - SDR: Nooelec NESDR SMArt v5 as a bare board (RTL-SDR Blog V4 is discontinued), for airband, ADS-B, AIS, Meteor-M and marine VHF. 4-port micro-USB OTG hub (BerryBase).
 - Sensors: BME280 (0x76, behind an ePTFE vent), ATGM336H GPS (/dev/serial0), MPU-6050 (0x69, AD0 high), BMM150 compass (0x13, DFRobot Fermion; QMC5883L 0x0D also supported), DS3231 RTC (0x68).
 - Audio: PAM8403 with L+R inputs joined; Si4732 and sound stick each fed in through 10 kΩ; 2 thin 40 mm speakers, one per channel, for redundancy. A spare PAM8403 is included (Bas said yes, 31 Oct 2026).
-- Light: 1 W white LED (GPIO12) and red LED (GPIO13), each through a MOSFET with a 100 Ω gate resistor and 10 kΩ pull-down.
+- Light: 3 W RGB LED with heatsink (TinyTronics). Each die on its own high-power MOSFET module: green GPIO12, red GPIO13, blue GPIO16. Series resistors from 5 V: red 8.2 Ω, green and blue 5.6 Ω, 1 W each. White = all dies, night light = red die.
 - Case: printed by Bas in ASA (or PETG), O-ring seal (NBR/EPDM), TPU bumpers, conformal coating (essential at sea), about 110 × 85 × 45 mm, 250 to 350 g.
 - Optional: Meshtastic LoRa node (Heltec V3 / LilyGO T-Echo, about €25-40) on the USB hub; app/mesh.py in the radio tab, untested with real nodes. No two-way satellite (carry a PLB or messenger separately).
 - Fallback board if Pis stay sold out: Radxa Zero 3W (see docs/boards.md in the software; needs GPIO changes, untested). Pi stays default.

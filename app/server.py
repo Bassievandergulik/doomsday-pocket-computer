@@ -62,7 +62,8 @@ DEFAULT_CONFIG = {
     "meshtastic_port": "auto",          # USB serial port of a Meshtastic node, or "auto"
     "board": "pi",                      # "pi" (Raspberry Pi 3 B+); see docs/boards.md for alternatives
     "light_white_gpio": 12,             # MOSFET gate of the 1 W white LED (PWM pin)
-    "light_red_gpio": 13,               # MOSFET gate of the red LED (PWM pin)                 # RTL-SDR tuner gain in dB for the airband receiver             # keep the WAV recordings (about 1 MB per minute)
+    "light_red_gpio": 13,               # MOSFET gate of the red LED (PWM pin)
+    "light_blue_gpio": 16,              # 3 W RGB LED: 12 = green die, 13 = red die, 16 = blue die. None = separate white + red LEDs
     "i2c_bus": 1,
     "weather_interval_s": 600,
     "forecast_auto_download": True,     # opportunistic: refresh the forecast whenever internet happens to be there
@@ -162,7 +163,8 @@ class App:
         threading.Thread(target=self._clock_from_gps, daemon=True).start()
         self.mesh = mesh_mod.Mesh(self.config["meshtastic_port"], get_position=self.position)
         self.mesh.start()
-        self.light = light_mod.Light(self.config["light_white_gpio"], self.config["light_red_gpio"])
+        self.light = light_mod.Light(self.config["light_white_gpio"], self.config["light_red_gpio"],
+                                     self.config.get("light_blue_gpio"))
         self.airband = airband_mod.Airband(self.get_setting, self.set_setting, self.config["audio_device"],
                                            self.config["airband_gain"], self.config["airband_ppm"])
         self._seed_presets()
