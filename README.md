@@ -121,7 +121,7 @@ The app runs as the `doomsday` systemd service on port 8080 and Chromium shows i
 | BMM150 compass (optional; QMC5883L and HMC5883L also work) | same bus (0x13 on the DFRobot Fermion board), mount flat away from the speaker magnet |
 | GPS (u-blox NEO-6M/M8N) TX → RX | GPIO15 (pin 10); GPS RX ← GPIO14 (pin 8); or use a USB GPS |
 
-| RGB LED green / red / blue die | MOSFET gates on GPIO12 (pin 32) / GPIO13 (pin 33) / GPIO16 (pin 36). Series resistor per die from 5 V: red 8.2 Ω, green and blue 5.6 Ω, each 1 W (about 330 mA) |
+| RGB LED green / red / blue die | MOSFET gates on GPIO12 (pin 32) / GPIO13 (pin 33) / GPIO16 (pin 36). Series resistor per die from 5 V, about 250 mA: red 4× 47 Ω ¼ W in parallel (≈12 Ω), green and blue each 3× 22 Ω ¼ W in parallel (≈7 Ω) |
 | MPU-6050 (GY-521) | same I2C bus, 3.3 V, **AD0 → 3.3 V** (address 0x69; the DS3231 has 0x68). Mount it firmly in the case |
 | DS3231 clock | same I2C bus, 3.3 V |
 | RTL-SDR stick + USB sound stick | plugged straight into two of the Pi's USB-A ports (the 4-port hub is no longer needed) |
