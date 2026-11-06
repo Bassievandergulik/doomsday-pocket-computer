@@ -29,7 +29,7 @@ Every piece of hardware is optional: without GPS the map works from the map cent
 app/server.py        web server + API (Python standard library only)
 app/geo.py           geometry, distance/bearing, UTM, sun times
 app/gps.py           gpsd or raw NMEA serial GPS reader
-app/sensors.py       BME280 weather sensor, QMC5883L/HMC5883L compass
+app/sensors.py       BME280 weather sensor, BMM150/QMC5883L/HMC5883L compass
 app/radio.py         picks the radio driver from config (radio_chip)
 app/radio_si4732.py  Si4732/Si4735 FM/AM/SW/SSB driver (default), loads the SSB patch
 app/radio_rda5807.py RDA5807M FM-only driver (alternative)
@@ -118,7 +118,7 @@ The app runs as the `doomsday` systemd service on port 8080 and Chromium shows i
 | Si4732 antennas | FM: ~75 cm wire. AM/SW input: 5–10 m long wire, as high as possible |
 | USB sound stick | via a micro-USB OTG adapter in the Zero's **data** port (the one marked USB, not PWR) |
 | BME280 SDA / SCL | same bus, address 0x76 or 0x77, 3.3 V |
-| QMC5883L compass (optional) | same bus, mount flat away from the speaker magnet |
+| BMM150 compass (optional; QMC5883L and HMC5883L also work) | same bus (0x13 on the DFRobot Fermion board), mount flat away from the speaker magnet |
 | GPS (u-blox NEO-6M/M8N) TX → RX | GPIO15 (pin 10); GPS RX ← GPIO14 (pin 8); or use a USB GPS |
 
 | White LED / red LED | MOSFET gates on GPIO12 (pin 32) / GPIO13 (pin 33), with a gate resistor and pull-down |

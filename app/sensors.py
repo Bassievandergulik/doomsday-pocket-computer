@@ -1,4 +1,4 @@
-"""I2C sensors: BME280 weather sensor and an optional QMC5883L/HMC5883L compass.
+"""I2C sensors: BME280 weather sensor and an optional BMM150, QMC5883L or HMC5883L compass.
 
 Everything here degrades gracefully: if smbus2 or the chip is missing the
 sensor reports `available = False` and the rest of the app keeps working.
@@ -200,8 +200,75 @@ class BME280:
                 "humidity": round(hum, 1) if hum is not None else None}
 
 
+class BMM150:
+    """Bosch BMM150 magnetometer (e.g. DFRobot Fermion board, I2C 0x13 by default).
+
+    The raw readings are only usable after Bosch's temperature/hall compensation,
+    which needs the factory trim values stored in the chip (registers 0x5D-0x71).
+    compensate_xy() is Bosch's floating-point formula from the BMM150 API.
+    """
+    ADDRESSES = (0x13, 0x12, 0x11, 0x10)
+    CHIP_ID = 0x32
+    OVERFLOW_XY = -4096
+
+    def __init__(self, bus, addr):
+        self.bus, self.addr = bus, addr
+        bus.write_byte_data(addr, 0x4B, 0x01)       # power control on (leaves suspend mode)
+        time.sleep(0.005)
+        if bus.read_byte_data(addr, 0x40) != self.CHIP_ID:
+            raise OSError("no BMM150 at 0x%02X" % addr)
+        bus.write_byte_data(addr, 0x4C, 0x00)       # normal mode, 10 Hz
+        bus.write_byte_data(addr, 0x51, 0x04)       # XY repetitions 9 ("regular" preset)
+        bus.write_byte_data(addr, 0x52, 0x0E)       # Z repetitions 15
+        self._read_trim()
+
+    @classmethod
+    def probe(cls, bus):
+        for addr in cls.ADDRESSES:
+            try:
+                return cls(bus, addr)
+            except OSError:
+                continue
+        return None
+
+    def _read_trim(self):
+        r = lambda reg, n: bytes(self.bus.read_i2c_block_data(self.addr, reg, n))
+        self.dig_x1, self.dig_y1 = struct.unpack("<bb", r(0x5D, 2))
+        self.dig_x2, self.dig_y2 = struct.unpack("<bb", r(0x64, 2))
+        xyz1 = struct.unpack("<H", r(0x6C, 2))[0]
+        self.dig_xyz1 = xyz1 & 0x7FFF
+        self.dig_xy2, self.dig_xy1 = struct.unpack("<bB", r(0x70, 2))
+
+    @staticmethod
+    def parse(d):
+        """8 data bytes from 0x42 -> (x, y, z, rhall) raw ADC values."""
+        x = struct.unpack("<h", d[0:2])[0] >> 3   # 13-bit signed
+        y = struct.unpack("<h", d[2:4])[0] >> 3
+        z = struct.unpack("<h", d[4:6])[0] >> 1   # 15-bit signed
+        rhall = struct.unpack("<H", d[6:8])[0] >> 2  # 14-bit unsigned
+        return x, y, z, rhall
+
+    def _comp(self, raw, rhall, d1, d2):
+        if raw == self.OVERFLOW_XY:
+            return None
+        x0 = rhall or self.dig_xyz1
+        if not x0:
+            return None
+        r = self.dig_xyz1 * 16384.0 / x0 - 16384.0
+        a = self.dig_xy2 * (r * r / 268435456.0) + r * self.dig_xy1 / 16384.0
+        v = raw * (a + 256.0) * (d2 + 160.0)
+        return (v / 8192.0 + d1 * 8.0) / 16.0  # microtesla
+
+    def compensate_xy(self, x, y, rhall):
+        return self._comp(x, rhall, self.dig_x1, self.dig_x2), self._comp(y, rhall, self.dig_y1, self.dig_y2)
+
+    def read_xy(self):
+        x, y, _z, rhall = self.parse(bytes(self.bus.read_i2c_block_data(self.addr, 0x42, 8)))
+        return self.compensate_xy(x, y, rhall)
+
+
 class Compass:
-    """QMC5883L (0x0D) or HMC5883L (0x1E) magnetometer. Hold the device flat.
+    """BMM150 (0x10-0x13), QMC5883L (0x0D) or HMC5883L (0x1E) magnetometer. Hold the device flat.
 
     Calibrate by calling start_calibration(), turning the device through a few
     full circles, then finish_calibration(). Offsets are returned so they can be saved.
@@ -214,10 +281,17 @@ class Compass:
         self.declination = declination
         self.cal = calibration or {"xmin": -1, "xmax": 1, "ymin": -1, "ymax": 1}
         self._calibrating = None
+        self._last = None
         if bus is None:
             return
         try:
-            if bus.read_byte_data(0x0D, 0x0D) == 0xFF:
+            self.bmm = BMM150.probe(bus)
+        except OSError:
+            self.bmm = None
+        if self.bmm is not None:
+            self.kind, self.addr = "bmm150", self.bmm.addr
+        try:
+            if self.kind is None and bus.read_byte_data(0x0D, 0x0D) == 0xFF:
                 self.kind, self.addr = "qmc", 0x0D
                 bus.write_byte_data(0x0D, 0x0B, 0x01)
                 bus.write_byte_data(0x0D, 0x09, 0x1D)  # continuous, 200Hz, 8G, OSR 512
@@ -235,6 +309,14 @@ class Compass:
         self.available = self.kind is not None
 
     def raw(self):
+        if self.kind == "bmm150":
+            x, y = self.bmm.read_xy()
+            if x is None or y is None:  # overflow (strong magnet nearby): keep the last good reading
+                if self._last is None:
+                    raise OSError("BMM150 overflow")
+                return self._last
+            self._last = (x, y)
+            return x, y
         if self.kind == "qmc":
             d = bytes(self.bus.read_i2c_block_data(self.addr, 0x00, 6))
             x, y, _z = struct.unpack("<hhh", d)

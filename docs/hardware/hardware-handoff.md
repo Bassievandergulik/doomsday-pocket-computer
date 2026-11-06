@@ -11,7 +11,7 @@ Next steps, other boards and add-ons: https://claude.ai/artifact/UgNt2oEdvyDaBiR
 - Power: Waveshare UPS HAT (C). It charges via MICRO-USB, so a waterproof panel USB-C socket (5.1 kΩ CC resistors) is wired to its 5 V input. 1000 mAh cell swapped for a 3000 to 5000 mAh 1S LiPo (JST-PH 2.0, check polarity). INA219 at 0x43; battery % is read from voltage. Bas later wants his own spot-welded 1S2P 18650 pack with a BMS on the same connector.
 - Radio: Si4732 (FM/AM/SW/SSB, I2C 0x11, RST GPIO23), weather fax over a USB sound stick (10 µF cap + divider), 5 to 10 m wire antenna via a cable gland.
 - SDR: Nooelec NESDR SMArt v5 as a bare board (RTL-SDR Blog V4 is discontinued), for airband, ADS-B, AIS, Meteor-M and marine VHF. 4-port micro-USB OTG hub (BerryBase).
-- Sensors: BME280 (0x76, behind an ePTFE vent), ATGM336H GPS (/dev/serial0), MPU-6050 (0x69, AD0 high), QMC5883L (0x0D), DS3231 RTC (0x68).
+- Sensors: BME280 (0x76, behind an ePTFE vent), ATGM336H GPS (/dev/serial0), MPU-6050 (0x69, AD0 high), BMM150 compass (0x13, DFRobot Fermion; QMC5883L 0x0D also supported), DS3231 RTC (0x68).
 - Audio: PAM8403 with L+R inputs joined; Si4732 and sound stick each fed in through 10 kΩ; 2 thin 40 mm speakers, one per channel, for redundancy. A spare PAM8403 is included (Bas said yes, 31 Oct 2026).
 - Light: 1 W white LED (GPIO12) and red LED (GPIO13), each through a MOSFET with a 100 Ω gate resistor and 10 kΩ pull-down.
 - Case: printed by Bas in ASA (or PETG), O-ring seal (NBR/EPDM), TPU bumpers, conformal coating (essential at sea), about 110 × 85 × 45 mm, 250 to 350 g.
