@@ -415,6 +415,33 @@ class LightTest(unittest.TestCase):
         finally:
             light.lgpio = orig
 
+    def test_rgb_led(self):
+        import types
+        import light
+        level = {}
+
+        def pwm(h, p, f, d):
+            level[p] = d
+
+        def write(h, p, v):
+            level[p] = 100 if v else 0
+        fake = types.SimpleNamespace(gpiochip_open=lambda n: 7, gpio_claim_output=lambda h, p, v: None,
+                                     tx_pwm=pwm, gpio_write=write)
+        orig, light.lgpio = light.lgpio, fake
+        try:
+            L = light.Light(12, 13, 16)  # green, red, blue dies
+            self.assertTrue(L.status()["rgb"])
+            L.set("red", True, 30)
+            self.assertEqual((level.get(12, 0), level[13], level.get(16, 0)), (0, 30, 0))  # night light: red die only
+            L.set("white", True, 80)
+            self.assertEqual((level[12], level[13], level[16]), (80, 80, 80))  # torch: all three dies
+            L.set("white", False)
+            self.assertEqual((level[12], level[13], level[16]), (0, 30, 0))  # red stays on
+            L.set("red", False)
+            self.assertEqual(level[13], 0)
+        finally:
+            light.lgpio = orig
+
 
 def m_cos(deg):
     import math
@@ -467,6 +494,91 @@ class AirAndUvTest(unittest.TestCase):
         s = sensors.BME680(None)
         self.assertFalse(s.available)
         self.assertIsNone(s.read())
+
+
+class FakeBmm150Bus:
+    """BMM150 at 0x13 with typical factory trim values; the field is set as raw ADC counts."""
+    def __init__(self, chip_id=0x32):
+        import struct
+        self.regs = {0x40: chip_id}
+        trim = {0x5D: struct.pack("<bb", 0, 0), 0x64: struct.pack("<bb", 26, 26),
+                0x6C: struct.pack("<H", 6645), 0x70: struct.pack("<bB", -3, 29)}
+        for base, b in trim.items():
+            for i, v in enumerate(b):
+                self.regs[base + i] = v
+        self.writes = []
+        self.set_field(0, 0)
+
+    def set_field(self, x, y, rhall=6600):
+        import struct
+        d = struct.pack("<hhhH", x << 3, y << 3, 0, rhall << 2)
+        for i, v in enumerate(d):
+            self.regs[0x42 + i] = v
+
+    def read_byte_data(self, a, r):
+        if a != 0x13:
+            raise OSError
+        return self.regs.get(r, 0)
+
+    def write_byte_data(self, a, r, v):
+        if a != 0x13:
+            raise OSError
+        self.writes.append((r, v))
+
+    def read_i2c_block_data(self, a, r, n):
+        if a != 0x13:
+            raise OSError
+        return [self.regs.get(r + i, 0) for i in range(n)]
+
+
+class Bmm150Test(unittest.TestCase):
+    def test_detect_and_setup(self):
+        import sensors
+        bus = FakeBmm150Bus()
+        c = sensors.Compass(bus)
+        self.assertTrue(c.available)
+        self.assertEqual((c.kind, c.addr), ("bmm150", 0x13))
+        self.assertIn((0x4B, 0x01), bus.writes)  # powered up
+        self.assertIn((0x4C, 0x00), bus.writes)  # normal mode
+
+    def test_wrong_chip_id_is_not_a_compass(self):
+        import sensors
+        self.assertFalse(sensors.Compass(FakeBmm150Bus(chip_id=0x00)).available)
+
+    def test_parse_raw_bytes(self):
+        import sensors
+        import struct
+        d = struct.pack("<hhhH", -100 << 3, 250 << 3, -300 << 1, 6600 << 2)
+        self.assertEqual(sensors.BMM150.parse(d), (-100, 250, -300, 6600))
+
+    def test_compensation_is_plausible(self):
+        import sensors
+        bus = FakeBmm150Bus()
+        m = sensors.BMM150(bus, 0x13)
+        x, y = m.compensate_xy(1000, -1000, 6600)
+        # about 0.3 uT per count on this chip: Earth's field (25-65 uT) is a few hundred counts
+        self.assertTrue(250 < x < 400, x)
+        self.assertAlmostEqual(x, -y, places=6)
+        self.assertEqual(m.compensate_xy(-4096, 10, 6600)[0], None)  # overflow
+
+    def test_heading_follows_field(self):
+        import sensors
+        bus = FakeBmm150Bus()
+        c = sensors.Compass(bus)
+        for deg in (0, 45, 90, 180, 270):
+            bus.set_field(int(round(150 * m_cos(deg))), int(round(150 * m_cos(90 - deg))))
+            h = c.heading()
+            diff = (h - deg + 180) % 360 - 180
+            self.assertLess(abs(diff), 1.0, (deg, h))
+
+    def test_overflow_keeps_last_reading(self):
+        import sensors
+        bus = FakeBmm150Bus()
+        c = sensors.Compass(bus)
+        bus.set_field(150, 0)
+        first = c.heading()
+        bus.set_field(-4096, 0)
+        self.assertEqual(c.heading(), first)
 
 
 class FakeRdaBus:

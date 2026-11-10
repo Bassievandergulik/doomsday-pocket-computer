@@ -1,7 +1,11 @@
-"""Torch: a 1 W white LED and a red LED, each switched by a MOSFET from a GPIO.
+"""Torch: a white LED and a red LED, or one 3 W RGB LED, switched by MOSFETs from GPIOs.
 
-Default pins: white GPIO12, red GPIO13 (free next to the 3.5" screen, the I2C bus,
-the GPS UART and the radio reset pin). Brightness is PWM via lgpio; without lgpio
+Separate LEDs (default): white GPIO12, red GPIO13 (free next to the 3.5" screen, the
+I2C bus, the GPS UART and the radio reset pin).
+
+RGB LED (set light_blue_gpio, e.g. 16): GPIO12 drives the green die, GPIO13 the red
+die and the blue GPIO the blue die. "White" lights all three dies, "red" only the
+red die, so one LED gives both the torch and the night light. Brightness is PWM via lgpio; without lgpio
 (on a PC) the light just reports itself unavailable.
 """
 import threading
@@ -18,8 +22,12 @@ SOS = [1, 1, 1, 0, 3, 3, 3, 0, 1, 1, 1]
 
 
 class Light:
-    def __init__(self, white_gpio=12, red_gpio=13):
+    def __init__(self, white_gpio=12, red_gpio=13, blue_gpio=None):
         self.pins = {"white": white_gpio, "red": red_gpio}
+        self.rgb = blue_gpio is not None
+        self.blue = blue_gpio
+        self._white_now = 0   # what the white channel shows right now (SOS flashes change it)
+        self._pin_now = {}
         self.level = {"white": 0, "red": 0}
         self.bright = {"white": 100, "red": 30}
         self.sos = False
@@ -33,16 +41,31 @@ class Light:
             return
         try:
             self.h = lgpio.gpiochip_open(0)
-            for p in self.pins.values():
+            for p in self._all_pins():
                 lgpio.gpio_claim_output(self.h, p, 0)
             self.available = True
         except Exception as e:  # lgpio raises its own error type
             self.error = "GPIO not available: %s" % e
 
+    def _all_pins(self):
+        return [self.pins["red"]] + ([self.blue] if self.rgb else []) + [self.pins["white"]]
+
     def _out(self, which, pct):
+        if which == "white":
+            self._white_now = pct
         if not self.available:
             return
-        pin = self.pins[which]
+        w, r = self._white_now, self.level["red"]
+        if self.rgb:  # green and blue dies follow white; the red die serves both
+            want = {self.pins["red"]: max(w, r), self.blue: w, self.pins["white"]: w}
+        else:
+            want = {self.pins["red"]: r, self.pins["white"]: w}
+        for pin in self._all_pins():  # white pin last, so a change of white is the final write
+            if self._pin_now.get(pin) != want[pin]:
+                self._pin_now[pin] = want[pin]
+                self._pwm(pin, want[pin])
+
+    def _pwm(self, pin, pct):
         if pct <= 0:
             lgpio.tx_pwm(self.h, pin, PWM_HZ, 0)
             lgpio.gpio_write(self.h, pin, 0)
@@ -96,6 +119,6 @@ class Light:
             self._sleep(6 * DOT)  # word gap
 
     def status(self):
-        return {"available": self.available, "error": self.error, "sos": self.sos,
+        return {"available": self.available, "error": self.error, "sos": self.sos, "rgb": self.rgb,
                 "white": {"on": self.level["white"] > 0, "brightness": self.bright["white"]},
                 "red": {"on": self.level["red"] > 0, "brightness": self.bright["red"]}}

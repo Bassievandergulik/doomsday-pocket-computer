@@ -15,7 +15,7 @@ No internet needed after setup.
 | **Weather** | BME280 temperature/humidity/pressure, 12-hour Zambretti forecast from the pressure trend, storm/frost/heat warnings, 48-hour pressure graph. Plus a downloaded 16-day forecast grid (Open-Meteo), refreshed automatically whenever a connection happens to be available, kept and shown offline with its age. |
 | **Guide** | 29-page survival library: first aid (CPR, bleeding, choking, burns, fractures, shock, hypothermia, heat, wounds, medicines), water, food, shelter, fire, navigation without GPS, signalling, radio, weather fax, weather signs, hygiene, knots, disasters. Searchable. |
 | **⇄** | Direct WiFi to your computer: the device becomes a hotspot (password on screen). On the computer, `http://10.42.0.1:8080/files` uploads maps (nav.db, map.mbtiles), GPX waypoints and your own guide pages, and downloads waypoints/track (GPX), the weather log (CSV) and a full backup. `http://10.42.0.1:8080` runs the whole app in the computer's browser. Switches itself off after an hour unused. Only computers on the device's own hotspot can reach it; when the device has joined some other WiFi network, nobody there can connect. |
-| **🔦** | Torch: 1 W white LED (brightness, SOS strobe) and red LED, each on a MOSFET from GPIO12 / GPIO13 (PWM via lgpio; `light_white_gpio`, `light_red_gpio`). |
+| **🔦** | Torch: 3 W RGB LED, white (all dies: brightness, SOS strobe) or red night light (red die), each die on a MOSFET from GPIO12 green / GPIO13 red / GPIO16 blue (PWM via lgpio; `light_white_gpio`, `light_red_gpio`, `light_blue_gpio`). Set `light_blue_gpio` to null for a separate white LED + red LED. |
 | **☾** | Red night mode. |
 
 **Touch only:** no keyboard needed. Every text field opens an on-screen keyboard (letters, numbers, symbols); a plugged-in keyboard still works too.
@@ -29,7 +29,7 @@ Every piece of hardware is optional: without GPS the map works from the map cent
 app/server.py        web server + API (Python standard library only)
 app/geo.py           geometry, distance/bearing, UTM, sun times
 app/gps.py           gpsd or raw NMEA serial GPS reader
-app/sensors.py       BME280 weather sensor, QMC5883L/HMC5883L compass
+app/sensors.py       BME280 weather sensor, BMM150/QMC5883L/HMC5883L compass
 app/radio.py         picks the radio driver from config (radio_chip)
 app/radio_si4732.py  Si4732/Si4735 FM/AM/SW/SSB driver (default), loads the SSB patch
 app/radio_rda5807.py RDA5807M FM-only driver (alternative)
@@ -118,10 +118,10 @@ The app runs as the `doomsday` systemd service on port 8080 and Chromium shows i
 | Si4732 antennas | FM: ~75 cm wire. AM/SW input: 5–10 m long wire, as high as possible |
 | USB sound stick | via a micro-USB OTG adapter in the Zero's **data** port (the one marked USB, not PWR) |
 | BME280 SDA / SCL | same bus, address 0x76 or 0x77, 3.3 V |
-| QMC5883L compass (optional) | same bus, mount flat away from the speaker magnet |
+| BMM150 compass (optional; QMC5883L and HMC5883L also work) | same bus (0x13 on the DFRobot Fermion board), mount flat away from the speaker magnet |
 | GPS (u-blox NEO-6M/M8N) TX → RX | GPIO15 (pin 10); GPS RX ← GPIO14 (pin 8); or use a USB GPS |
 
-| White LED / red LED | MOSFET gates on GPIO12 (pin 32) / GPIO13 (pin 33), with a gate resistor and pull-down |
+| RGB LED green / red / blue die | MOSFET gates on GPIO12 (pin 32) / GPIO13 (pin 33) / GPIO16 (pin 36). Series resistor per die from 5 V, about 250 mA: red 4× 47 Ω ¼ W in parallel (≈12 Ω), green and blue each 3× 22 Ω ¼ W in parallel (≈7 Ω) |
 | MPU-6050 (GY-521) | same I2C bus, 3.3 V, **AD0 → 3.3 V** (address 0x69; the DS3231 has 0x68). Mount it firmly in the case |
 | DS3231 clock | same I2C bus, 3.3 V |
 | RTL-SDR stick + USB sound stick | plugged straight into two of the Pi's USB-A ports (the 4-port hub is no longer needed) |
