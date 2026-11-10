@@ -1,0 +1,86 @@
+/*
+ * Waveshare 3.5" RPi LCD (B) (ILI9486 + ADS7846 touch) on the kernel's DRM driver.
+ *
+ * Waveshare's own overlay (waveshare35b-v2) uses the old fbtft framebuffer driver, which the
+ * Wayland kiosk (cage) can't draw on. The same panel works with the mainline tinydrm "ili9486"
+ * driver (compatible "waveshare,rpi-lcd-35"), which shows up as a normal /dev/dri/card device.
+ * Pins and speed are taken from Waveshare's overlay: DC = GPIO24, RESET = GPIO25,
+ * touch pen-down = GPIO17, display on CE0, touch on CE1.
+ *
+ * Built and installed by deploy/screen.sh:
+ *   dtc -@ -I dts -O dtb -o waveshare35b-drm.dtbo waveshare35b-drm.dts
+ */
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2835";
+
+	fragment@0 {
+		target = <&spi0>;
+		__overlay__ {
+			status = "okay";
+		};
+	};
+
+	fragment@1 {
+		target = <&spidev0>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@2 {
+		target = <&spidev1>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+
+	fragment@3 {
+		target = <&gpio>;
+		__overlay__ {
+			ws35b_pins: ws35b_pins {
+				brcm,pins = <17 25 24>;
+				brcm,function = <0 1 1>; /* in out out */
+			};
+		};
+	};
+
+	fragment@4 {
+		target = <&spi0>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			ws35b: display@0 {
+				compatible = "waveshare,rpi-lcd-35", "ilitek,ili9486";
+				reg = <0>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&ws35b_pins>;
+				spi-max-frequency = <15000000>;
+				/* 180 = the same landscape orientation as Waveshare's "rotate=90" (MADCTL 0x28) */
+				rotation = <180>;
+				reset-gpios = <&gpio 25 0>; /* active high for the DRM driver */
+				dc-gpios = <&gpio 24 0>;
+			};
+
+			ws35b_ts: touch@1 {
+				compatible = "ti,ads7846";
+				reg = <1>;
+				spi-max-frequency = <50000>;
+				interrupts = <17 2>; /* falling edge */
+				interrupt-parent = <&gpio>;
+				pendown-gpio = <&gpio 17 1>; /* active low */
+				ti,x-plate-ohms = /bits/ 16 <60>;
+				ti,y-plate-ohms = /bits/ 16 <60>;
+				ti,pressure-max = /bits/ 16 <255>;
+			};
+		};
+	};
+
+	__overrides__ {
+		speed = <&ws35b>, "spi-max-frequency:0";
+		rotation = <&ws35b>, "rotation:0";
+	};
+};

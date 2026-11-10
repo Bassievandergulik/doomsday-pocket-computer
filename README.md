@@ -97,7 +97,7 @@ Search for "khan" on library.kiwix.org for Khan Academy collections. Pick what f
 After adding guide pages or videos, the search picks them up on the next restart (or `curl -X POST http://127.0.0.1:8080/api/find/reload`).
 
 ## 2. Install on the Pi
-Flash Raspberry Pi OS Lite (64-bit), set up the touchscreen driver for your display, copy this folder to the Pi, then (WiFi is only needed during this setup):
+Flash Raspberry Pi OS Lite (64-bit), copy this folder to the Pi, then (WiFi is only needed during this setup):
 ```bash
 bash deploy/install.sh
 cp nav.db map.mbtiles ~/doomsday/data/     # copy your maps BEFORE the reboot
@@ -106,6 +106,7 @@ sudo reboot
 The app runs as the `doomsday` systemd service on port 8080 and Chromium shows it full-screen through `cage`.
 
 **Nothing relies on a connection.** Maps, search, navigation, the guide, the radio and the barometer forecast all work with no network at all. WiFi stays on only so the device can refresh the downloaded forecast whenever it happens to be in range of a known network or your phone's hotspot; with no connection it keeps the last forecast and shows its age.
+- **Screen:** the installer sets up the Waveshare 3.5" RPi LCD (B) touchscreen itself (`deploy/screen.sh`); don't run Waveshare's LCD-show script, its old framebuffer driver can't be used by the kiosk. It uses the kernel's DRM driver for this panel, keeps the IPS colour inversion on, and maps touch with a calibration matrix in `/etc/udev/rules.d/99-waveshare35b-touch.rules` (adjust the six numbers if taps land off). Using an HDMI monitor instead: `SCREEN=hdmi bash deploy/install.sh`. Untested on the real panel.
 - Want WiFi and Bluetooth fully off (less power)? Install with `NO_WIFI=1 bash deploy/install.sh`.
 - Updating maps without WiFi: put the SD card in any PC and copy files to the `doomsday` folder on the boot partition (the one Windows/Mac can open). The app looks there too. Big satellite files may not fit there: copy those over WiFi or during setup.
 

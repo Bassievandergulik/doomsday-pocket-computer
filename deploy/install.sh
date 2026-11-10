@@ -114,6 +114,11 @@ UNIT
 sudo systemctl daemon-reload
 sudo systemctl enable --now kiwix
 
+if [ "${SCREEN:-waveshare35b}" = "waveshare35b" ]; then
+  # Waveshare 3.5" RPi LCD (B); use SCREEN=hdmi for a normal monitor instead
+  bash "$APP_DIR/deploy/screen.sh"
+fi
+
 echo "== Kiosk: auto-login on tty1 and show the app full screen"
 sudo raspi-config nonint do_boot_behaviour B2   # console autologin
 cp "$APP_DIR/deploy/kiosk.sh" "$HOME/kiosk.sh"
