@@ -12,7 +12,7 @@ import threading
 
 try:
     import lgpio
-except ImportError:
+except (ImportError, OSError):  # not installed, or lgpio can't start (it then crashed the whole app)
     lgpio = None
 
 PWM_HZ = 800  # well above visible flicker

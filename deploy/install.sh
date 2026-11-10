@@ -77,6 +77,9 @@ After=network.target gpsd.service
 
 [Service]
 User=$USER_NAME
+WorkingDirectory=$APP_DIR/data
+# lgpio (torch, radio reset) creates its notify pipe in the working directory; "/" isn't writable
+Environment=LG_WD=/tmp
 ExecStart=/usr/bin/python3 $APP_DIR/app/server.py --data $APP_DIR/data
 Restart=always
 RestartSec=3

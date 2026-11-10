@@ -102,7 +102,7 @@ class Si4732:
             return
         try:
             import lgpio
-        except ImportError:
+        except (ImportError, OSError):
             return  # RST tied high through an RC network instead
         h = lgpio.gpiochip_open(0)
         lgpio.gpio_claim_output(h, self.reset_gpio, 0)
