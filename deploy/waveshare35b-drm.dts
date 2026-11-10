@@ -76,7 +76,15 @@
 				pendown-gpio = <&gpio 17 1>; /* active low */
 				ti,x-plate-ohms = /bits/ 16 <60>;
 				ti,y-plate-ohms = /bits/ 16 <60>;
-				ti,pressure-max = /bits/ 16 <255>;
+				/* The driver drops every reading whose touch resistance is above pressure-max.
+				 * A light or wide finger press reads higher than a stylus, so with Waveshare's 255
+				 * finger taps and drags kept getting lost. The debounce values average a few
+				 * readings so the point doesn't jitter. Tune with ,pmax=.. ,dbtol=.. in config.txt. */
+				ti,pressure-max = /bits/ 16 <1000>;
+				ti,debounce-max = /bits/ 16 <10>;
+				ti,debounce-tol = /bits/ 16 <30>;
+				ti,debounce-rep = /bits/ 16 <1>;
+				ti,settle-delay-usec = /bits/ 16 <150>;
 			};
 		};
 	};
@@ -84,5 +92,7 @@
 	__overrides__ {
 		speed = <&ws35b>, "spi-max-frequency:0";
 		rotation = <&ws35b>, "rotation:0";
+		pmax = <&ws35b_ts>, "ti,pressure-max.0";
+		dbtol = <&ws35b_ts>, "ti,debounce-tol.0";
 	};
 };

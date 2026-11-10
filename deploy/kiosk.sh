@@ -12,7 +12,7 @@ done
 # Touch-only device: hide the mouse pointer. cage draws one in the middle of the screen
 # and CSS "cursor: none" can't reach it, so give cage and Chromium an invisible cursor theme.
 BLANK="$HOME/.icons/doomsday-blank/cursors"
-if [ ! -f "$BLANK/default" ]; then
+if [ ! -s "$BLANK/default" ]; then  # -s: redo an empty file left by an interrupted run
   mkdir -p "$BLANK"
   python3 - "$BLANK/default" <<'PY'
 import struct, sys

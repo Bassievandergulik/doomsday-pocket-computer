@@ -34,6 +34,12 @@ sudo tee /etc/udev/rules.d/99-waveshare35b-touch.rules >/dev/null <<'RULE'
 ATTRS{name}=="ADS7846 Touchscreen", ENV{LIBINPUT_CALIBRATION_MATRIX}="0 -1.1275 1.0826 1.1677 0 -0.0838"
 RULE
 
+echo "== Hide the mouse pointer"
+# The HDMI port's CEC remote input reports mouse axes, so cage thinks a mouse is connected
+# and draws a pointer. Ignore it: with only the touchscreen, cage hides the pointer.
+echo 'KERNEL=="event*", ATTRS{name}=="vc4-hdmi", ENV{LIBINPUT_IGNORE_DEVICE}="1"' | \
+  sudo tee /etc/udev/rules.d/99-doomsday-ignore-cec.rules >/dev/null
+
 echo "== Colours: Waveshare's panel settings for the (B)"
 # The kernel driver's start-up values are for the (A) panel and look washed-out grey on the (B).
 # A small root service sends Waveshare's (B) values through the driver's debug interface.
