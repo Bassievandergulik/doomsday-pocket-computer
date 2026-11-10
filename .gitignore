@@ -10,6 +10,7 @@ nav.db
 *.sqlite
 # Si4732 SSB patch: personal-use licence, downloaded by the installer
 *ssb_patch*
+!tools/get_ssb_patch.py
 # Videos and recordings
 *.mp4
 *.webm

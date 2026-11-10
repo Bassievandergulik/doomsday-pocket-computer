@@ -756,5 +756,18 @@ class BuilderTest(unittest.TestCase):
                              "Teststad")
 
 
+
+class SsbPatchToolTest(unittest.TestCase):
+    def test_convert(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
+        import get_ssb_patch
+        rows = ["0x15, 0x00, 0x0F, 0xE0, 0xF2, 0x73, 0x76, 0x2F"] + ["0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00"] * 3 \
+            + ["0x15, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00"]
+        text = "const uint8_t ssb_patch_content[] PROGMEM = {\n" + ",\n".join(rows) + "\n};"
+        data = get_ssb_patch.convert(text)
+        self.assertEqual(len(data), 40)
+        with self.assertRaises(ValueError):
+            get_ssb_patch.convert("ssb_patch_content[] = { 0x01, 0x02 };")
+
 if __name__ == "__main__":
     unittest.main()
