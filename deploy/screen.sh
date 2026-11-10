@@ -34,17 +34,20 @@ sudo tee /etc/udev/rules.d/99-waveshare35b-touch.rules >/dev/null <<'RULE'
 ATTRS{name}=="ADS7846 Touchscreen", ENV{LIBINPUT_CALIBRATION_MATRIX}="0 -1.1275 1.0826 1.1677 0 -0.0838"
 RULE
 
-echo "== Colours: this IPS panel needs colour inversion switched on"
-# The kernel driver's start-up sequence is written for the (A) panel and leaves inversion off,
-# which shows a photo-negative picture on the (B). A small root service sends the panel's
-# "inversion on" command (0x21) through the driver's debug interface.
-sudo install -m 755 "$APP_DIR/deploy/lcd-invert.sh" /usr/local/bin/doomsday-lcd-invert
-sudo tee /etc/systemd/system/lcd-invert.service >/dev/null <<'UNIT'
+echo "== Colours: Waveshare's panel settings for the (B)"
+# The kernel driver's start-up values are for the (A) panel and look washed-out grey on the (B).
+# A small root service sends Waveshare's (B) values through the driver's debug interface.
+for old in lcd-invert lcd-colors; do  # earlier versions of this service
+  sudo systemctl disable --now "$old" 2>/dev/null || true
+  sudo rm -f "/etc/systemd/system/$old.service" "/usr/local/bin/doomsday-$old"
+done
+sudo install -m 755 "$APP_DIR/deploy/lcd-init.sh" /usr/local/bin/doomsday-lcd-init
+sudo tee /etc/systemd/system/lcd-init.service >/dev/null <<'UNIT'
 [Unit]
-Description=Colour inversion for the Waveshare 3.5" LCD (B)
+Description=Waveshare 3.5" LCD (B) panel settings
 
 [Service]
-ExecStart=/usr/local/bin/doomsday-lcd-invert
+ExecStart=/usr/local/bin/doomsday-lcd-init
 Restart=always
 RestartSec=5
 
@@ -52,7 +55,7 @@ RestartSec=5
 WantedBy=multi-user.target
 UNIT
 sudo systemctl daemon-reload
-sudo systemctl enable lcd-invert
+sudo systemctl enable lcd-init
 
 echo
 echo "Screen set up. Reboot to use it:  sudo reboot"

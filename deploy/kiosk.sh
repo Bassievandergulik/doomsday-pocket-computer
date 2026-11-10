@@ -10,6 +10,6 @@ for c in /sys/class/drm/card[0-9]; do
   fi
 done
 exec cage -d -- "$BROWSER" --kiosk --noerrdialogs --disable-infobars --no-first-run \
-  --disable-translate --disable-features=TranslateUI --overscroll-history-navigation=0 \
+  --disable-translate --disable-features=TranslateUI --overscroll-history-navigation=0 --disable-smooth-scrolling \
   --disk-cache-size=10000000 --renderer-process-limit=1 \
   --enable-features=OverlayScrollbar --password-store=basic "http://127.0.0.1:8080/?kiosk=1"
