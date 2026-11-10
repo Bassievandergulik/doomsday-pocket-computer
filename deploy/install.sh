@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install the pocket survival computer on Raspberry Pi OS Lite (Bookworm or newer, 64-bit).
+# Install the pocket survival computer on Raspberry Pi OS Lite (Bookworm or Trixie, 64-bit).
 # Run once, with internet, as the normal user (not root):   bash deploy/install.sh
 set -euo pipefail
 APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -7,8 +7,12 @@ USER_NAME="$(whoami)"
 
 echo "== Packages"
 sudo apt-get update
-sudo apt-get install -y python3 python3-smbus2 python3-serial python3-lgpio python3-numpy python3-bme680 gpsd gpsd-clients \
+sudo apt-get install -y python3 python3-smbus2 python3-serial python3-lgpio python3-numpy python3-pip gpsd gpsd-clients \
     i2c-tools cage curl network-manager alsa-utils fake-hwclock
+# Pimoroni's BME680 library is not packaged in Debian; install it system-wide for the app service.
+# Optional: without it the weather tab falls back to a BME280 or says the sensor is missing.
+sudo pip3 install --break-system-packages bme680 2>/dev/null || sudo pip3 install bme680 || \
+  echo "!! Could not install the bme680 package; the BME680 sensor will not be used."
 sudo apt-get install -y chromium || sudo apt-get install -y chromium-browser
 
 echo "== Enable I2C (radio, weather sensor, compass) and the serial port (GPS)"
