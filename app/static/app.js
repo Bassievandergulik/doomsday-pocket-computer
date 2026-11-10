@@ -2,6 +2,8 @@
 "use strict";
 
 const $ = (s) => document.querySelector(s);
+// Every change on screen is sent over the slow SPI link to the 3.5" LCD: only touch what changed.
+function setText(el, s) { if (el.textContent !== s) el.textContent = s; }
 
 if (/[?&]kiosk=1/.test(location.search)) {
   document.body.classList.add("kiosk");
@@ -145,11 +147,12 @@ async function pollGps() {
     S.manual = g.manual_pos || null;
     S.dr = ok ? null : (g.dr || null);
     const st = $("#st-gps");
-    st.className = ok ? "fix" : (S.dr || S.manual ? "" : "nofix");
-    st.textContent = ok ? `GPS ${g.mode}D ${g.sats ?? ""}sat`
-      : S.dr ? `Estimated ±${fmtDist(S.dr.err_m)}` : (S.manual ? "Position set by hand" : (g.source === "none" ? "No position" : "GPS searching"));
+    const cls = ok ? "fix" : (S.dr || S.manual ? "" : "nofix");
+    if (st.className !== cls) st.className = cls;
+    setText(st, ok ? `GPS ${g.mode}D ${g.sats ?? ""}sat`
+      : S.dr ? `Estimated ±${fmtDist(S.dr.err_m)}` : (S.manual ? "Position set by hand" : (g.source === "none" ? "No position" : "GPS searching")));
     const p = myPos();
-    $("#st-pos").textContent = p ? p.lat.toFixed(5) + ", " + p.lon.toFixed(5) : "";
+    setText($("#st-pos"), p ? p.lat.toFixed(5) + ", " + p.lon.toFixed(5) : "");
     map.overlay.pos = S.fix || S.dr || (S.manual ? { lat: S.manual.lat, lon: S.manual.lon, manual: true } : null);
     map.overlay.heading = S.heading;
     const fp = myPos();
@@ -157,12 +160,16 @@ async function pollGps() {
       map.setView(fp.lat, fp.lon, map.zoom < 13 ? 15 : map.zoom);
       S.followedEst = ok ? null : fp;  // estimates: only move the map when the estimate moves
     }
-    else map.redraw();
+    else if (S.page === "map") {
+      // redraw only when the position marker or heading actually moved
+      const key = JSON.stringify([map.overlay.pos, map.overlay.heading]);
+      if (key !== S.drawnKey) { S.drawnKey = key; map.redraw(); }
+    }
     if (S.page === "go") updateGo();
   } catch (e) { /* server restarting */ }
 }
 setInterval(pollGps, 1000);
-setInterval(() => { $("#st-clock").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }, 1000);
+setInterval(() => { setText($("#st-clock"), new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })); }, 1000);
 
 // ---------------------------------------------------------------- clock
 // The Pi has no clock battery and this build has no GPS, so after a long power-off
