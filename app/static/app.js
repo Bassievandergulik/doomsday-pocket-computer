@@ -2,6 +2,17 @@
 "use strict";
 
 const $ = (s) => document.querySelector(s);
+
+if (/[?&]kiosk=1/.test(location.search)) {
+  document.body.classList.add("kiosk");
+  // Chromium won't make its window narrower than ~500 px, so on the 480 px screen
+  // the right edge would fall off: lay the page out at the screen's own width.
+  const fit = () => {
+    const w = screen.width && screen.width < innerWidth ? screen.width + "px" : "";
+    document.documentElement.style.width = w;
+  };
+  fit(); addEventListener("resize", fit);
+}
 const api = (url, body) => fetch(url, body === undefined ? {} : {
   method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
 }).then(r => r.json());

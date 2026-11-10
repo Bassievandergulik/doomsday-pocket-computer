@@ -8,7 +8,8 @@ USER_NAME="$(whoami)"
 echo "== Packages"
 sudo apt-get update
 sudo apt-get install -y python3 python3-smbus2 python3-serial python3-lgpio python3-numpy python3-pip gpsd gpsd-clients \
-    i2c-tools cage curl network-manager alsa-utils fake-hwclock
+    i2c-tools cage curl network-manager alsa-utils fake-hwclock \
+    fonts-noto-color-emoji  # torch icon in the tab bar
 # Pimoroni's BME680 library is not packaged in Debian; install it system-wide for the app service.
 # Optional: without it the weather tab falls back to a BME280 or says the sensor is missing.
 sudo pip3 install --break-system-packages bme680 2>/dev/null || sudo pip3 install bme680 || \
