@@ -20,6 +20,13 @@ sudo sed -i -E 's/^#(dtoverlay=waveshare35b-drm)/\1/' "$CFG"
 grep -q '^dtparam=spi=on' "$CFG" || echo 'dtparam=spi=on' | sudo tee -a "$CFG" >/dev/null
 grep -q '^dtoverlay=waveshare35b-drm' "$CFG" || echo 'dtoverlay=waveshare35b-drm' | sudo tee -a "$CFG" >/dev/null
 
+echo "== Boot messages and login prompt on the 3.5\" screen"
+# Without a console on it the screen stays black until the kiosk starts (and when it can't)
+CMDLINE="$(dirname "$CFG")/cmdline.txt"
+if [ -f "$CMDLINE" ] && ! grep -q 'fbcon=map:' "$CMDLINE"; then
+  sudo sed -i '1 s/$/ fbcon=map:1/' "$CMDLINE"
+fi
+
 echo "== Touch: map the touch panel onto the screen"
 # Derived from Waveshare's X11 calibration for this panel (SwapAxes, 3932 300 294 3801 on a 0..4095 range).
 # If touches land in the wrong place, fine-tune these six numbers and reboot.

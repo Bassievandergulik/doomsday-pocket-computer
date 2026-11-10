@@ -9,6 +9,9 @@ body.night canvas { filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-40deg)
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
   font: 15px/1.35 system-ui, "DejaVu Sans", sans-serif; overflow: hidden; user-select: none; }
 body { display: flex; flex-direction: column; }
+/* on the device's own touchscreen: no mouse pointer */
+body.kiosk, body.kiosk * { cursor: none !important; }
+nav#tabs button { min-width: 0; overflow: hidden; }
 #status { display: flex; gap: 10px; padding: 2px 8px; font-size: 12px; color: var(--mut);
   background: var(--card); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; }
 #st-clock { margin-left: auto; }
