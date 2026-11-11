@@ -759,7 +759,12 @@ const SECTION_NAMES = { "00-emergency": "Emergency first", "my-pages": "My pages
   shelter: "Shelter & fire", navigation: "Navigation", comms: "Signals & radio", skills: "Skills & tools",
   general: "General" };
 async function loadLibraryIndex() {
-  const idx = await api("/api/library");
+  let idx;
+  try { idx = await api("/api/library"); } catch (e) {
+    // the app server was restarting: say so instead of leaving the page blank
+    $("#lib-index").innerHTML = '<button data-retry="1">Could not load the guide. Tap to try again.</button>';
+    return;
+  }
   const order = Object.keys(SECTION_NAMES);
   const rank = (s) => (order.indexOf(s) + 1) || 99;
   $("#lib-index").innerHTML = Object.keys(idx).sort((a, b) => rank(a) - rank(b)).map(sec => `<div class="sec"><h3>${esc(SECTION_NAMES[sec] || sec)}</h3>
@@ -771,7 +776,10 @@ async function openPage(id) {
   $("#lib-index").classList.add("hidden"); $("#lib-page").classList.remove("hidden");
   $("#p-info").scrollTop = 0;
 }
-$("#lib-index").onclick = (e) => { const id = e.target.dataset.page; if (id) openPage(id); };
+$("#lib-index").onclick = (e) => {
+  if (e.target.dataset.retry) return loadLibraryIndex();
+  const id = e.target.dataset.page; if (id) openPage(id);
+};
 $("#lib-body").onclick = (e) => { const id = e.target.dataset.page; if (id) { e.preventDefault(); openPage(id); } };
 $("#lib-back").onclick = () => { $("#lib-page").classList.add("hidden"); $("#lib-index").classList.remove("hidden"); };
 let libSize = load("libSize") || 15;
