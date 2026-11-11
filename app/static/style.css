@@ -172,9 +172,9 @@ body.night #v-body pre { color: var(--fg); }
 .lt-big.on { background: var(--acc); color: #000; }
 
 /* up/down arrows: finger scrolling on the resistive screen is hard, so every long page gets buttons */
-#scroll-arrows { position: fixed; right: 2px; bottom: 46px; z-index: 26; display: flex; flex-direction: column; gap: 6px; }
+#scroll-arrows { position: fixed; right: 12px; bottom: 46px; z-index: 26; display: flex; flex-direction: column; gap: 6px; }
 #scroll-arrows button { width: 44px; height: 52px; padding: 0; font-size: 20px; opacity: .85; }
 #scroll-arrows button:disabled { opacity: .25; }
 body.osk-open #scroll-arrows { display: none; }
-.page.scrolly { padding-right: 50px; }
-#s-reader.scrolly, #viewer.scrolly { padding-right: 48px; }
+.page.scrolly { padding-right: 62px; }
+#s-reader.scrolly, #viewer.scrolly { padding-right: 60px; }
