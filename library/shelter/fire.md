@@ -13,7 +13,12 @@ Gather **3× more** than you think you need.
 - **Ferro rod**: scrape the rod (not the striker) hard and fast toward the tinder, or pull the rod back while holding the striker still so you don't scatter the tinder.
 - **Battery**: 9 V battery against steel wool, or a AA with a gum-wrapper strip cut thin in the middle.
 - **Lens**: magnifier, glasses, clear water-filled bag, focus sunlight to the smallest point on dark tinder.
-- **Bow drill**: hard skill. Practise before you need it.
+- **Bow drill** (no lighter at all; practise it at home first, it takes strength and technique):
+  1. **Board**: a flat piece of dry, soft, dead wood (willow, lime, poplar, cedar, ivy), about 2 cm thick. **Spindle**: a straight dry stick of the same wood, thumb-thick, 20 cm long, blunt point at the bottom, sharper at the top. **Bearing block**: a hand-sized piece of hard wood or stone with a small dent for the top of the spindle. **Bow**: a slightly curved stick as long as your arm, with a cord (bootlace, paracord) tied loosely enough to twist once around the spindle.
+  2. Kneel with your left foot on the board (right-handed). Twist the spindle into the bow cord, put it on the board 1 cm from the edge, press the bearing block on top with your left hand, wrist braced against your shin.
+  3. Saw the bow back and forth in long even strokes to drill a black burnt hole. Then cut a **V-shaped notch** from the edge of the board to the centre of the hole (like a pizza slice, 1/8 of the circle).
+  4. Put a leaf or bark under the notch. Drill again, steadily faster and pressing a bit harder, until dark smoke pours out and black powder fills the notch. Keep going 10–20 seconds more.
+  5. Carefully lift the board: the powder should glow as a **coal**. Let it grow for a moment, tip it into a ball of fine dry tinder, fold it gently around and **blow softly** until it bursts into flame.
 
 ## Building
 - **Teepee**: tinder ball, kindling leaned around it in a cone, light from the windward side. Best to start.
@@ -23,6 +28,9 @@ Feed slowly: add thicker wood only once the smaller pieces are burning well. Blo
 
 ## Wet conditions
 Shave off wet bark, split sticks to get the dry core, make "feather sticks" (curls cut along a dry stick), build a platform of sticks so the fire is off wet ground, shelter it with your body or a tarp held high.
+
+## Putting it out
+Drown it with water, stir the ashes, drown again; or smother with soil or sand and stir. Feel with the back of your hand: it must be cold. Fires buried under a few cm of soil can keep smouldering in peat and roots for days.
 
 ## Fire uses
 - Reflector wall of logs or rocks behind the fire throws heat into your shelter.

@@ -754,7 +754,25 @@ class BuilderTest(unittest.TestCase):
             self.assertEqual(db.execute("SELECT count(*) FROM pois").fetchone()[0], 3)
             self.assertEqual(db.execute("SELECT name FROM search WHERE search MATCH 'tests*'").fetchone()[0],
                              "Teststad")
+            # small R-trees for fast zoomed-out tiles hold exactly the features with minz <= 9
+            for t in ("lines", "areas"):
+                self.assertEqual(
+                    db.execute("SELECT count(*) FROM %s_lo_idx" % t).fetchone()[0],
+                    db.execute("SELECT count(*) FROM %s WHERE minz<=9" % t).fetchone()[0])
 
+
+
+class SsbPatchToolTest(unittest.TestCase):
+    def test_convert(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
+        import get_ssb_patch
+        rows = ["0x15, 0x00, 0x0F, 0xE0, 0xF2, 0x73, 0x76, 0x2F"] + ["0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00"] * 3 \
+            + ["0x15, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00"]
+        text = "const uint8_t ssb_patch_content[] PROGMEM = {\n" + ",\n".join(rows) + "\n};"
+        data = get_ssb_patch.convert(text)
+        self.assertEqual(len(data), 40)
+        with self.assertRaises(ValueError):
+            get_ssb_patch.convert("ssb_patch_content[] = { 0x01, 0x02 };")
 
 if __name__ == "__main__":
     unittest.main()

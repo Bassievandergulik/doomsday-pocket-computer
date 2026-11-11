@@ -1,23 +1,28 @@
 """Tiny stand-in for kiwix-serve (catalog, suggest, full-text search, content), used by the tests.
-Responses follow the formats of kiwix-serve 3.x under --urlRootLocation=/kiwix."""
+Responses follow the formats of kiwix-serve 3.8 under --urlRootLocation=/kiwix: the catalog <name> is
+the short book name (wikipedia_en_all) while content, suggest and search use the file name from the
+text/html link, and numbers come with thousands separators."""
 import http.server
 import json
 import threading
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import unquote, parse_qs, urlparse
 
 BOOKS = [("wikipedia_en_all_maxi_2026-01", "Wikipedia", "eng"),
          ("wikipedia_es_all_nopic_2026-01", "Wikipedia (español)", "spa"),
          ("wikimed_nl_2026-01", "WikiMed", "nld")]
 ARTICLES = {
     "wikipedia_en_all_maxi_2026-01": {"Burn": "A burn is an injury to skin caused by heat, cold, electricity...",
-                                      "Burns_Night": "Burns Night is a celebration of the poet Robert Burns."},
+                                      "Burns_Night": "Burns Night is a celebration of the poet Robert Burns.",
+                                      "Curaçao": "Curaçao is an island in the southern Caribbean Sea."},
     "wikipedia_es_all_nopic_2026-01": {"Quemadura": "Una quemadura es un tipo de lesión en la piel..."},
     "wikimed_nl_2026-01": {"Brandwond": "Een brandwond is een beschadiging van de huid..."},
 }
 
+REDIRECTS = {"Curacao": "Cura%C3%A7ao"}  # relative, as kiwix-serve sends it
+
 
 def catalog():
-    entries = "".join(f"""<entry><id>urn:uuid:{n}</id><title>{t}</title><name>{n}</name><flavour>maxi</flavour>
+    entries = "".join(f"""<entry><id>urn:uuid:{n}</id><title>{t}</title><name>{n.rsplit("_", 2)[0]}</name><flavour>maxi</flavour>
 <category>wikipedia</category><language>{l}</language><articleCount>{len(ARTICLES[n])}</articleCount>
 <link type="text/html" href="/kiwix/content/{n}"/></entry>""" for n, t, l in BOOKS)
     return f"""<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom"
@@ -58,17 +63,19 @@ class H(http.server.BaseHTTPRequestHandler):
             hits = [(t, txt) for t, txt in ARTICLES[book].items() if pat.split()[0] in (t + txt).lower()]
             items = "".join(f"<item><title>{t.replace('_', ' ')}</title><link>/kiwix/content/{book}/{t}</link>"
                             f"<description>...{txt[:60]} &lt;b&gt;match&lt;/b&gt;...</description>"
-                            f"<book><title>{book}</title></book><wordCount>123</wordCount></item>" for t, txt in hits)
+                            f"<book><title>{book}</title></book><wordCount>1,234</wordCount></item>" for t, txt in hits)
             return self._out(200, f"""<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
 xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/"><channel><title>Search</title>
-<opensearch:totalResults>{len(hits)}</opensearch:totalResults>{items}</channel></rss>""", "application/rss+xml")
+<opensearch:totalResults>{len(hits) * 1000:,}</opensearch:totalResults>{items}</channel></rss>""", "application/rss+xml")
         if p.startswith("/kiwix/content/"):
             rest = p[len("/kiwix/content/"):].split("/", 1)
             book = rest[0]
             if len(rest) == 1 or not rest[1]:
                 first = sorted(ARTICLES[book])[0]
                 return self._out(302, "", extra=[("Location", "/kiwix/content/%s/%s" % (book, first))])
-            txt = ARTICLES.get(book, {}).get(rest[1])
+            if rest[1] in REDIRECTS:  # like Wikipedia's redirect pages: Curacao -> Curaçao
+                return self._out(302, "", extra=[("Location", REDIRECTS[rest[1]])])
+            txt = ARTICLES.get(book, {}).get(unquote(rest[1]))
             if txt is None:
                 return self._out(404, "not found")
             return self._out(200, "<html><body><h1>%s</h1><p>%s</p></body></html>" % (rest[1], txt))

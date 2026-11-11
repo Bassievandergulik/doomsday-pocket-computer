@@ -21,7 +21,7 @@ Any dirty wound, puncture or bite is a tetanus risk if the last vaccination was 
 Small and intact: cover with a padded plaster/tape. Large and painful: clean, pierce at the edge with a sterile needle, leave the skin on, cover.
 
 ## Splinters and fish hooks
-Splinter: pull out in the direction it went in. Fish hook: push through, cut off the barb, back it out; or the string-yank method if trained.
+Splinter: pull out in the direction it went in. Fish hook in the skin: if the point is near the surface, **push it on through** until the barb comes out, cut the barb off with pliers, and pull the hook back out the way it came. Clean as above and watch for infection. Hooks near the eye or deep in a joint: leave in, tape it still and get help.
 
 ## Bites and stings (Europe)
 - **Ticks**: remove with tick tweezers or fine tweezers, grip close to the skin, pull straight out slowly. Mark the date. A spreading red ring (≥5 cm) days to weeks later, or flu-like illness, may be Lyme disease: needs antibiotics.

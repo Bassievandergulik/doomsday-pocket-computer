@@ -117,14 +117,16 @@ article code { background: var(--card); padding: 0 3px; }
 .fc-table td, .fc-table th { padding: 2px 3px; border-bottom: 1px solid var(--line); text-align: right; }
 .fc-table td:first-child, .fc-table th:first-child { text-align: left; }
 
-#osk { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--card);
+#osk { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; touch-action: none; background: var(--card);
   border-top: 2px solid var(--acc); padding: 4px; display: flex; flex-direction: column; gap: 3px; }
 #osk-top { display: flex; gap: 4px; align-items: center; }
 #osk-title { font-size: 11px; color: var(--mut); max-width: 30%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 #osk-field { flex: 1; min-height: 34px; font-size: 16px; }
 .osk-x { min-height: 34px; width: 44px; padding: 0; }
+#osk-keys { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
 .osk-row { display: flex; gap: 3px; }
-.osk-row button { flex: 1; min-height: 40px; padding: 0; font-size: 17px; border-radius: 6px; min-width: 0; }
+.osk-row button.down { background: var(--acc); color: #000; transform: scale(1.08); }
+.osk-row button { flex: 1; min-height: 52px; padding: 0; font-size: 17px; border-radius: 6px; min-width: 0; }
 .osk-row button.fn { flex: 1.4; font-size: 14px; background: var(--line); }
 .osk-row button.space { flex: 4; }
 body.osk-open main { padding-bottom: 0; }
@@ -168,3 +170,18 @@ body.night #v-body pre { color: var(--fg); }
 #torch.lit { color: #000; background: var(--acc); }
 .lt-big { min-height: 56px !important; font-size: 18px; }
 .lt-big.on { background: var(--acc); color: #000; }
+
+/* up/down arrows: finger scrolling on the resistive screen is hard, so every long page gets buttons */
+#scroll-arrows { position: fixed; right: 12px; bottom: 46px; z-index: 26; display: flex; flex-direction: column; gap: 6px; }
+#scroll-arrows button { width: 44px; height: 52px; padding: 0; font-size: 20px; opacity: .85; }
+#scroll-arrows button:disabled { opacity: .25; }
+body.osk-open #scroll-arrows { display: none; }
+.page.scrolly { padding-right: 62px; }
+#s-reader.scrolly, #viewer.scrolly { padding-right: 60px; }
+
+/* guide: flags & signs pictures */
+#lib-body img.sign { height: 44px; vertical-align: middle; }
+#lib-body .flag { font-size: 30px; line-height: 1; font-family: "Noto Color Emoji", sans-serif; }
+#lib-body img.photo { display: block; width: 100%; max-width: 420px; border-radius: 6px; margin: 4px 0 8px; }
+/* the guide's Back / A- / A+ bar stays at the top while you scroll a page */
+#lib-page > .row { position: sticky; top: -8px; z-index: 3; background: var(--bg); margin: -8px 0 6px; padding: 8px 0 4px; }

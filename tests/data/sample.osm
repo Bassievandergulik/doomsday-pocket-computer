@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="handmade">
+  <node id="1" lat="52.0000" lon="5.9000"/>
+  <node id="2" lat="52.0050" lon="5.9100"/>
+  <node id="3" lat="52.0100" lon="5.9200"/>
+  <node id="4" lat="52.0020" lon="5.9020"/>
+  <node id="5" lat="52.0020" lon="5.9080"/>
+  <node id="6" lat="52.0060" lon="5.9080"/>
+  <node id="7" lat="52.0060" lon="5.9020"/>
+  <node id="10" lat="52.0030" lon="5.9050"><tag k="amenity" v="drinking_water"/></node>
+  <node id="11" lat="52.0080" lon="5.9150"><tag k="amenity" v="pharmacy"/><tag k="name" v="Apotheek Centrum"/></node>
+  <node id="12" lat="52.0040" lon="5.9110"><tag k="place" v="village"/><tag k="name" v="Teststad"/><tag k="population" v="1200"/></node>
+  <node id="13" lat="52.0090" lon="5.9010"><tag k="amenity" v="shelter"/><tag k="name" v="Boshut"/></node>
+  <way id="100"><nd ref="1"/><nd ref="2"/><nd ref="3"/><tag k="highway" v="primary"/><tag k="name" v="Hoofdweg"/></way>
+  <way id="101"><nd ref="4"/><nd ref="5"/><nd ref="6"/><nd ref="7"/><nd ref="4"/><tag k="natural" v="water"/><tag k="name" v="Vijver"/></way>
+</osm>

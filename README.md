@@ -64,6 +64,7 @@ pip install osmium
 # e.g. a province: https://download.geofabrik.de/europe/netherlands/utrecht-latest.osm.pbf
 python3 tools/build_navdb.py utrecht-latest.osm.pbf data/nav.db
 ```
+Several regions go into one map: list them all, e.g. `python3 tools/build_navdb.py netherlands-latest.osm.pbf curacao.osm data/nav.db`. For a small island without its own Geofabrik file, download it from Overpass by bounding box (Curaçao: `curl -o curacao.osm 'https://overpass-api.de/api/interpreter?data=[out:xml][timeout:300];(nwr(11.97,-69.20,12.40,-68.70););(._;>;);out;'`).
 Rough sizes: a Dutch province gives a 30–150 MB database in 5–20 minutes; all of the Netherlands (≈1.3 GB pbf) needs 8+ GB RAM, about an hour, and gives roughly 1–1.5 GB. Add `--buildings` for house outlines (much larger). Map data © OpenStreetMap contributors, ODbL.
 
 ## 1b. Satellite imagery (optional, on your PC)

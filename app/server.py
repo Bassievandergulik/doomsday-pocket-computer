@@ -42,6 +42,7 @@ from search import Finder, LANGS, LANG_NAMES  # noqa: E402
 
 STATIC = os.path.join(HERE, "static")
 MAX_DATA_ZOOM = 14  # vector tiles above this zoom reuse z14 data
+LO_IDX_ZOOM = 9     # up to this zoom, tiles use lines_lo_idx/areas_lo_idx (features with minz <= 9)
 
 DEFAULT_CONFIG = {
     "port": 8080,
@@ -236,6 +237,14 @@ class App:
             self._local.nav = db
         return db
 
+    def _has_lo_index(self, db):
+        """nav.db built by tools/build_navdb.py since 2026-11 has small R-trees for zoom <= LO_IDX_ZOOM."""
+        has = getattr(self._local, "lo_idx", None)
+        if has is None:
+            names = {r[0] for r in db.execute("SELECT name FROM sqlite_master")}
+            has = self._local.lo_idx = {"lines_lo_idx", "areas_lo_idx"} <= names
+        return has
+
     def mbtiles(self):
         if not os.path.exists(self.mbtiles_path):
             return None
@@ -285,15 +294,19 @@ class App:
         mx, my = (e - w) * 0.05, (n - s) * 0.05
         args = (dz, w - mx, e + mx, s - my, n + my)
         col = "COALESCE(geom_lo, geom)" if dz < 12 else "geom"
+        # Zoomed out, a tile covers much of the country but shows only the few big features: use the
+        # small R-trees that hold only those, instead of reading every feature in the box from the
+        # full R-tree and dropping most of them (up to 40 s per tile on the Pi for the Netherlands).
+        sfx = "_lo_idx" if dz <= LO_IDX_ZOOM and self._has_lo_index(db) else "_idx"
         out = {"lines": [], "areas": [], "places": [], "pois": []}
         for cls, name, g in db.execute(
-                "SELECT t.cls, t.name, %s FROM areas t JOIN areas_idx i ON t.id=i.id "
-                "WHERE t.minz<=? AND i.maxx>=? AND i.minx<=? AND i.maxy>=? AND i.miny<=? LIMIT 4000" % col,
+                "SELECT t.cls, t.name, %s FROM areas t JOIN areas%s i ON t.id=i.id "
+                "WHERE t.minz<=? AND i.maxx>=? AND i.minx<=? AND i.maxy>=? AND i.miny<=? LIMIT 4000" % (col, sfx),
                 (args[0], args[1], args[2], args[3], args[4])):
             out["areas"].append([cls, geo.decode(g)])
         for cls, name, g in db.execute(
-                "SELECT t.cls, t.name, %s FROM lines t JOIN lines_idx i ON t.id=i.id "
-                "WHERE t.minz<=? AND i.maxx>=? AND i.minx<=? AND i.maxy>=? AND i.miny<=? LIMIT 8000" % col,
+                "SELECT t.cls, t.name, %s FROM lines t JOIN lines%s i ON t.id=i.id "
+                "WHERE t.minz<=? AND i.maxx>=? AND i.minx<=? AND i.maxy>=? AND i.miny<=? LIMIT 8000" % (col, sfx),
                 (args[0], args[1], args[2], args[3], args[4])):
             out["lines"].append([cls, name if z >= 15 else None, geo.decode(g)])
         for kind, name, lon, lat in db.execute(
@@ -815,7 +828,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, "not found", "text/plain")
         ext = os.path.splitext(path)[1]
         ctype = {".html": "text/html; charset=utf-8", ".js": "application/javascript", ".css": "text/css",
-                 ".svg": "image/svg+xml", ".png": "image/png"}.get(ext, "application/octet-stream")
+                 ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg"}.get(ext, "application/octet-stream")
         with open(path, "rb") as f:
             self._send(200, f.read(), ctype, cache="no-cache")
 

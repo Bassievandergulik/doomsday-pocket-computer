@@ -272,9 +272,24 @@ class Builder(osmium.SimpleHandler):
         self._progress()
 
 
+LO_IDX_ZOOM = 9
+
+
+def add_lo_index(db):
+    """Small R-trees with only the features shown up to zoom 9, so zoomed-out map tiles don't
+    have to read (and throw away) every road in the country. Safe to run on an existing nav.db."""
+    for t in ("lines", "areas"):
+        db.execute("DROP TABLE IF EXISTS %s_lo_idx" % t)
+        db.execute("CREATE VIRTUAL TABLE %s_lo_idx USING rtree(id, minx, maxx, miny, maxy)" % t)
+        db.execute("INSERT INTO %s_lo_idx SELECT i.id, i.minx, i.maxx, i.miny, i.maxy FROM %s_idx i "
+                   "JOIN %s t ON t.id=i.id WHERE t.minz<=?" % (t, t, t), (LO_IDX_ZOOM,))
+    db.commit()
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("input", help=".osm.pbf (or .osm) extract, e.g. from download.geofabrik.de")
+    ap.add_argument("input", nargs="+", help=".osm.pbf (or .osm) extract(s), e.g. from download.geofabrik.de; "
+                    "several (netherlands.osm.pbf curacao.osm) go into one map")
     ap.add_argument("output", help="output database, e.g. data/nav.db")
     ap.add_argument("--buildings", action="store_true", help="include building outlines (much bigger)")
     args = ap.parse_args()
@@ -287,14 +302,15 @@ def main():
     db.execute("PRAGMA synchronous=OFF")
     db.executescript(SCHEMA)
 
-    print("Reading %s ..." % args.input, flush=True)
     b = Builder(db, buildings=args.buildings)
-    # 'flex_mem' keeps node locations in RAM; fine for regional/country extracts
-    b.apply_file(args.input, locations=True, idx="flex_mem")
-    db.commit()
+    for f in args.input:
+        print("Reading %s ..." % f, flush=True)
+        # 'flex_mem' keeps node locations in RAM; fine for regional/country extracts
+        b.apply_file(f, locations=True, idx="flex_mem")
+        db.commit()
 
     meta = {
-        "source": os.path.basename(args.input),
+        "source": " + ".join(os.path.basename(f) for f in args.input),
         "built": time.strftime("%Y-%m-%d %H:%M"),
         "bbox": json.dumps(b.bbox),
         "counts": json.dumps(b.n),
@@ -303,6 +319,7 @@ def main():
     db.executemany("INSERT INTO meta VALUES(?,?)", meta.items())
     db.commit()
     print("Optimising ...", flush=True)
+    add_lo_index(db)
     db.execute("INSERT INTO search(search) VALUES('optimize')")
     db.commit()
     db.execute("VACUUM")

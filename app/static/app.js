@@ -756,10 +756,15 @@ setInterval(() => { if (S.page === "wx") loadForecast(); }, 300000);
 
 // ---------------------------------------------------------------- LIBRARY page
 const SECTION_NAMES = { "00-emergency": "Emergency first", "my-pages": "My pages", firstaid: "First aid", water: "Water", food: "Food",
-  shelter: "Shelter & fire", navigation: "Navigation", comms: "Signals & radio", skills: "Skills & tools",
+  shelter: "Shelter & fire", wild: "Wilderness", plants: "Plants & mushrooms", navigation: "Navigation", comms: "Signals & radio", signs: "Flags & signs", skills: "Skills & tools",
   general: "General" };
 async function loadLibraryIndex() {
-  const idx = await api("/api/library");
+  let idx;
+  try { idx = await api("/api/library"); } catch (e) {
+    // the app server was restarting: say so instead of leaving the page blank
+    $("#lib-index").innerHTML = '<button data-retry="1">Could not load the guide. Tap to try again.</button>';
+    return;
+  }
   const order = Object.keys(SECTION_NAMES);
   const rank = (s) => (order.indexOf(s) + 1) || 99;
   $("#lib-index").innerHTML = Object.keys(idx).sort((a, b) => rank(a) - rank(b)).map(sec => `<div class="sec"><h3>${esc(SECTION_NAMES[sec] || sec)}</h3>
@@ -768,12 +773,20 @@ async function loadLibraryIndex() {
 async function openPage(id) {
   const p = await api("/api/library/page?id=" + encodeURIComponent(id));
   $("#lib-body").innerHTML = p.html || "Not found";
+  if (!$("#lib-index").classList.contains("hidden")) libIndexScroll = $("#p-info").scrollTop;
   $("#lib-index").classList.add("hidden"); $("#lib-page").classList.remove("hidden");
   $("#p-info").scrollTop = 0;
 }
-$("#lib-index").onclick = (e) => { const id = e.target.dataset.page; if (id) openPage(id); };
+$("#lib-index").onclick = (e) => {
+  if (e.target.dataset.retry) return loadLibraryIndex();
+  const id = e.target.dataset.page; if (id) openPage(id);
+};
 $("#lib-body").onclick = (e) => { const id = e.target.dataset.page; if (id) { e.preventDefault(); openPage(id); } };
-$("#lib-back").onclick = () => { $("#lib-page").classList.add("hidden"); $("#lib-index").classList.remove("hidden"); };
+let libIndexScroll = 0;
+$("#lib-back").onclick = () => {
+  $("#lib-page").classList.add("hidden"); $("#lib-index").classList.remove("hidden");
+  $("#p-info").scrollTop = libIndexScroll;  // back to where you were in the list
+};
 let libSize = load("libSize") || 15;
 const applySize = () => { $("#lib-body").style.fontSize = libSize + "px"; save("libSize", libSize); };
 $("#lib-bigger").onclick = () => { libSize = Math.min(24, libSize + 1); applySize(); };
@@ -867,6 +880,9 @@ async function findAll() {
     let w;
     try { w = await api(`/api/find/wiki?book=${encodeURIComponent(b.name)}&q=${encodeURIComponent(b.query)}`); }
     catch (e) { w = { results: [], error: "not reachable" }; }
+    if (!w.results.length && b.alt && run === findRun) {  // what you typed found nothing: try the spelling fix
+      try { w = await api(`/api/find/wiki?book=${encodeURIComponent(b.name)}&q=${encodeURIComponent(b.alt)}`); } catch (e) { /* keep first */ }
+    }
     if (run !== findRun) return;
     const el = $("#s-book-" + i);
     if (!el) continue;
@@ -919,3 +935,41 @@ if (view) map.setView(view[0], view[1], view[2]);
 map.overlay.target = S.target;
 loadStatus().then(() => { loadWaypoints(); pollGps(); });
 setInterval(loadStatus, 60000);
+
+// ---------------------------------------------------------------- scroll arrows
+// Dragging a finger on the resistive screen is hit and miss; these buttons scroll by most of a screen.
+function scrollTarget() {
+  // returns [element that scrolls, element that should make room for the arrows]
+  if (!$("#viewer").classList.contains("hidden")) return [$("#v-body"), $("#viewer")];
+  if (S.page === "search" && !$("#s-reader").classList.contains("hidden")) {
+    try {
+      const d = $("#s-frame").contentDocument;
+      if (d && d.scrollingElement && !$("#s-frame").classList.contains("hidden")) return [d.scrollingElement, $("#s-reader")];
+    } catch (e) { /* other origin: no arrows */ }
+    return [null, null];
+  }
+  const pg = $("#p-" + S.page);
+  if (!pg || S.page === "map") return [null, null];
+  return [pg, pg];
+}
+let saRoom = null;
+function scrollArrowsUpdate() {
+  const [el, room] = scrollTarget();
+  const can = el && el.scrollHeight > el.clientHeight + 4;
+  $("#scroll-arrows").classList.toggle("hidden", !can);
+  if (saRoom !== room || !can) { if (saRoom) saRoom.classList.remove("scrolly"); saRoom = null; }
+  if (can) {
+    if (room && !room.classList.contains("scrolly")) { room.classList.add("scrolly"); saRoom = room; }
+    $("#sa-up").disabled = el.scrollTop <= 0;
+    $("#sa-down").disabled = el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
+  }
+}
+function pageScroll(dir) {
+  const [el] = scrollTarget(); if (!el) return;
+  el.scrollTop += dir * 100;  // about 1.5 cm on the 3.5" screen (6.5 px per mm)
+  scrollArrowsUpdate();
+}
+$("#sa-up").onclick = () => pageScroll(-1);
+$("#sa-down").onclick = () => pageScroll(1);
+document.addEventListener("scroll", scrollArrowsUpdate, true);
+setInterval(scrollArrowsUpdate, 700);
