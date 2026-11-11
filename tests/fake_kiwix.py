@@ -1,5 +1,7 @@
 """Tiny stand-in for kiwix-serve (catalog, suggest, full-text search, content), used by the tests.
-Responses follow the formats of kiwix-serve 3.x under --urlRootLocation=/kiwix."""
+Responses follow the formats of kiwix-serve 3.8 under --urlRootLocation=/kiwix: the catalog <name> is
+the short book name (wikipedia_en_all) while content, suggest and search use the file name from the
+text/html link, and numbers come with thousands separators."""
 import http.server
 import json
 import threading
@@ -17,7 +19,7 @@ ARTICLES = {
 
 
 def catalog():
-    entries = "".join(f"""<entry><id>urn:uuid:{n}</id><title>{t}</title><name>{n}</name><flavour>maxi</flavour>
+    entries = "".join(f"""<entry><id>urn:uuid:{n}</id><title>{t}</title><name>{n.rsplit("_", 2)[0]}</name><flavour>maxi</flavour>
 <category>wikipedia</category><language>{l}</language><articleCount>{len(ARTICLES[n])}</articleCount>
 <link type="text/html" href="/kiwix/content/{n}"/></entry>""" for n, t, l in BOOKS)
     return f"""<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom"
@@ -58,10 +60,10 @@ class H(http.server.BaseHTTPRequestHandler):
             hits = [(t, txt) for t, txt in ARTICLES[book].items() if pat.split()[0] in (t + txt).lower()]
             items = "".join(f"<item><title>{t.replace('_', ' ')}</title><link>/kiwix/content/{book}/{t}</link>"
                             f"<description>...{txt[:60]} &lt;b&gt;match&lt;/b&gt;...</description>"
-                            f"<book><title>{book}</title></book><wordCount>123</wordCount></item>" for t, txt in hits)
+                            f"<book><title>{book}</title></book><wordCount>1,234</wordCount></item>" for t, txt in hits)
             return self._out(200, f"""<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
 xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/"><channel><title>Search</title>
-<opensearch:totalResults>{len(hits)}</opensearch:totalResults>{items}</channel></rss>""", "application/rss+xml")
+<opensearch:totalResults>{len(hits) * 1000:,}</opensearch:totalResults>{items}</channel></rss>""", "application/rss+xml")
         if p.startswith("/kiwix/content/"):
             rest = p[len("/kiwix/content/"):].split("/", 1)
             book = rest[0]

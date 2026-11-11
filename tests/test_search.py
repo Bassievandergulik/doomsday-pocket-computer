@@ -152,6 +152,10 @@ class EndToEndTest(unittest.TestCase):
         self.assertTrue(w["results"][0]["url"].startswith("/kiwix/content/wikipedia_en_all_maxi_2026-01/"))
         self.assertIn("Burns Night", [x["title"] for x in w["results"]])
         self.assertNotIn("<b>", json.dumps(w))
+        # kiwix-serve 3.8: books are addressed by their file name, numbers carry thousands separators
+        self.assertIn("wikipedia_en_all_maxi_2026-01", [b.get("name") for b in d["books"]])
+        w = json.loads(self.get("/api/find/wiki?book=wikipedia_en_all_maxi_2026-01&q=skin")[1])
+        self.assertEqual([x["title"] for x in w["results"]], ["Burn"])  # full-text only: no title starts with "skin"
 
     def test_map_concepts(self):
         d = json.loads(self.get("/api/find?q=" + quote("hospital"))[1])

@@ -10,12 +10,18 @@ import re
 import threading
 import time
 import xml.etree.ElementTree as ET
-from urllib.parse import quote, urlencode, urlparse
+from urllib.parse import quote, unquote, urlencode, urlparse
 
 ATOM = "{http://www.w3.org/2005/Atom}"
 # ZIM files use 3-letter language codes
 LANG3 = {"eng": "en", "nld": "nl", "spa": "es", "deu": "de", "ger": "de", "fra": "fr", "fre": "fr", "por": "pt",
          "ita": "it", "pol": "pl", "ukr": "uk", "rus": "ru", "ara": "ar", "tur": "tr"}
+
+
+def _int(s):
+    """kiwix-serve 3.8 writes numbers with thousands separators ("3,574")."""
+    digits = re.sub(r"\D", "", s or "")
+    return int(digits) if digits else 0
 
 
 def _strip(s):
@@ -50,13 +56,20 @@ class Kiwix:
                 out = []
                 if status == 200:
                     for e in ET.fromstring(body).iter(ATOM + "entry"):
-                        name = e.findtext(ATOM + "name") or ""
+                        # kiwix-serve 3.8 addresses books by the name in their text/html link
+                        # (wikipedia_nl_all_nopic_2026-04), not by the catalog <name> (wikipedia_nl_all)
+                        name = ""
+                        for link in e.iter(ATOM + "link"):
+                            href = link.get("href") or ""
+                            if link.get("type") == "text/html" and "/content/" in href:
+                                name = unquote(href.split("/content/", 1)[1].strip("/").split("/")[0])
+                        name = name or e.findtext(ATOM + "name") or ""
                         if not name:
                             continue
                         lang3 = (e.findtext(ATOM + "language") or "").split(",")[0].strip()
                         out.append({"name": name, "title": e.findtext(ATOM + "title") or name,
                                     "lang": LANG3.get(lang3, lang3[:2]), "category": e.findtext(ATOM + "category") or "",
-                                    "articles": int(e.findtext(ATOM + "articleCount") or 0),
+                                    "articles": _int(e.findtext(ATOM + "articleCount")),
                                     "url": "%s/content/%s/" % (self.root, quote(name))})
                 self._books = out
             except (OSError, ET.ParseError, ValueError):
@@ -96,7 +109,7 @@ class Kiwix:
         if ch is not None:
             for el in ch:
                 if el.tag.endswith("totalResults"):
-                    total = int(el.text or 0)
+                    total = _int(el.text)
         res = []
         for it in root.iter("item"):
             link = it.findtext("link") or ""
@@ -104,7 +117,7 @@ class Kiwix:
                 link = "%s/%s" % (self.root, link)
             res.append({"title": _strip(it.findtext("title")), "url": link,
                         "snippet": _strip(it.findtext("description"))[:240],
-                        "words": int(it.findtext("wordCount") or 0)})
+                        "words": _int(it.findtext("wordCount"))})
         return {"total": total or len(res), "results": res}
 
     def find(self, book, query, count=8):
