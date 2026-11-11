@@ -756,7 +756,7 @@ setInterval(() => { if (S.page === "wx") loadForecast(); }, 300000);
 
 // ---------------------------------------------------------------- LIBRARY page
 const SECTION_NAMES = { "00-emergency": "Emergency first", "my-pages": "My pages", firstaid: "First aid", water: "Water", food: "Food",
-  shelter: "Shelter & fire", navigation: "Navigation", comms: "Signals & radio", skills: "Skills & tools",
+  shelter: "Shelter & fire", navigation: "Navigation", comms: "Signals & radio", signs: "Flags & signs", skills: "Skills & tools",
   general: "General" };
 async function loadLibraryIndex() {
   let idx;

@@ -13,6 +13,10 @@ def _inline(text):
     t = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
     t = re.sub(r"(?<!\w)\*(.+?)\*(?!\w)", r"<i>\1</i>", t)
     t = re.sub(r"`(.+?)`", r"<code>\1</code>", t)
+    # pictures drawn by tools/make_signs.py:  ![Flag A](sign:flag-A.svg)
+    t = re.sub(r"!\[([^\]]*)\]\(sign:([\w\-]+\.svg)\)", r'<img class="sign" src="/static/signs/\2" alt="\1">', t)
+    # a cell that is only a country flag emoji: show it big
+    t = re.sub(r"^([\U0001F1E6-\U0001F1FF]{2})$", r'<span class="flag">\1</span>', t)
     t = re.sub(r"\[(.+?)\]\(page:([\w\-/]+)\)", r'<a href="#" data-page="\2">\1</a>', t)
     return t
 

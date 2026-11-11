@@ -138,7 +138,8 @@ class Kiwix:
         for t in tries:
             path = "/content/%s/%s" % (quote(book), quote(t.replace(" ", "_")))
             try:
-                c = http.client.HTTPConnection(self.host, self.port, timeout=6)
+                # a missing title answers at once; a big existing article can take ~15 s the first time
+                c = http.client.HTTPConnection(self.host, self.port, timeout=25)
                 try:
                     c.request("GET", self.root + path)
                     r = c.getresponse()

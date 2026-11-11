@@ -178,3 +178,7 @@ body.night #v-body pre { color: var(--fg); }
 body.osk-open #scroll-arrows { display: none; }
 .page.scrolly { padding-right: 62px; }
 #s-reader.scrolly, #viewer.scrolly { padding-right: 60px; }
+
+/* guide: flags & signs pictures */
+#lib-body img.sign { height: 44px; vertical-align: middle; }
+#lib-body .flag { font-size: 30px; line-height: 1; font-family: "Noto Color Emoji", sans-serif; }
