@@ -58,6 +58,7 @@ h3 { margin: 10px 0 4px; font-size: 14px; color: var(--mut); text-transform: upp
   border: 1px solid var(--line); border-radius: 12px; padding: 8px; display: grid;
   grid-template-columns: 1fr 1fr; gap: 6px; }
 #mm-title { grid-column: 1 / -1; font-size: 13px; color: var(--mut); }
+#mm-info { grid-column: 1 / -1; line-height: 1.35; }
 
 .go-wrap { display: flex; gap: 10px; align-items: center; }
 #compass { width: 200px; height: 200px; flex: 0 0 auto; }

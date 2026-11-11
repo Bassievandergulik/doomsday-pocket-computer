@@ -776,3 +776,93 @@ class SsbPatchToolTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WorldMapTest(unittest.TestCase):
+    """tools/build_world.py on tiny made-up sources, then the server's world tiles, search and nearest airport."""
+
+    @classmethod
+    def setUpClass(cls):
+        import json
+        import threading
+        sys.path.insert(0, os.path.join(ROOT, "tools"))
+        import build_world
+        import server
+        cls.tmp = tempfile.TemporaryDirectory()
+        cache = os.path.join(cls.tmp.name, "cache")
+        os.makedirs(cache)
+
+        def square(x0, y0, x1, y1):
+            return [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]]
+
+        def fc(feats):
+            return {"type": "FeatureCollection", "features": [
+                {"type": "Feature", "properties": p, "geometry": {"type": "Polygon", "coordinates": c}} for p, c in feats]}
+
+        files = {
+            "countries.geojson": fc([({"NAME_EN": "Testland", "ISO_A2_EH": "TL", "LABEL_X": 5, "LABEL_Y": 52,
+                                       "MIN_LABEL": 3}, square(3, 50, 7, 54))]),
+            "lakes.geojson": fc([({"featurecla": "Lake", "name": "Big Lake", "min_label": 4}, square(4, 51, 5, 52))]),
+            "marine.geojson": fc([({"featurecla": "sea", "name_en": "Test Sea", "min_label": 3}, square(0, 50, 2.5, 56))]),
+        }
+        for n, d in files.items():
+            with open(os.path.join(cache, n), "w") as f:
+                json.dump(d, f)
+        with open(os.path.join(cache, "airports.csv"), "w") as f:
+            f.write('"ident","type","name","latitude_deg","longitude_deg","elevation_ft","iso_country",'
+                    '"municipality","icao_code","iata_code","gps_code"\n'
+                    'XTBG,large_airport,"Testburg International",52.3,4.76,-11,TL,Testburg,XTBG,TBG,XTBG\n'
+                    'XSML,medium_airport,"Smallfield",53.0,6.0,30,TL,Smallville,,,XSML\n'
+                    'XHEL,heliport,"Hospital Heliport",52.0,5.0,0,TL,,,,\n')
+        with open(os.path.join(cache, "runways.csv"), "w") as f:
+            f.write('"airport_ident","length_ft","surface","closed","le_ident","he_ident"\n'
+                    'XTBG,12467,ASP,0,18R,36L\nXTBG,5000,GRS,1,04,22\n')
+        with open(os.path.join(cache, "frequencies.csv"), "w") as f:
+            f.write('"airport_ident","type","description","frequency_mhz"\n'
+                    'XTBG,TWR,Tower,118.1\nXTBG,ATIS,,132.975\nXTBG,OPS,,24.02\n')
+        cls.db = os.path.join(cls.tmp.name, "world.db")
+        build_world.build(cls.db, cache)
+
+        app = server.App.__new__(server.App)
+        app._local = threading.local()
+        app.world_path = cls.db
+        app.nav_path = os.path.join(cls.tmp.name, "missing-nav.db")
+        app.user_path = os.path.join(cls.tmp.name, "user.db")
+        app._init_user_db()
+        cls.app = app
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_airport_info(self):
+        info = sqlite3.connect(self.db).execute("SELECT info FROM airports WHERE icao='XTBG'").fetchone()[0]
+        self.assertIn("XTBG / TBG", info)
+        self.assertIn("RWY 18R/36L 3800 m asphalt", info)
+        self.assertNotIn("04/22", info)       # closed runway
+        self.assertIn("TWR 118.1", info)
+        self.assertIn("ATIS 132.975", info)
+        self.assertNotIn("24.02", info)        # not airband
+        n = sqlite3.connect(self.db).execute("SELECT count(*) FROM airports").fetchone()[0]
+        self.assertEqual(n, 2)                  # no heliports
+
+    def test_tiles(self):
+        z, x, y = 5, 16, 10  # around 5E 52N
+        t = self.app.vector_tile(z, x, y)
+        self.assertTrue(t["world"]["land"])
+        self.assertTrue(t["world"]["lakes"])
+        self.assertIn("Testland", [l[1] for l in t["world"]["labels"]])
+        self.assertEqual([a[0] for a in t["airports"]], ["XTBG"])  # medium airports only from z6
+        t = self.app.vector_tile(6, 33, 20)
+        self.assertIn("XSML", [a[0] for a in t["airports"]])
+        self.assertEqual(self.app.vector_tile(3, 4, 2)["airports"], [])
+
+    def test_search_and_nearest(self):
+        r = self.app.search("testburg", 52.0, 5.0)
+        ap = [i for i in r if i["kind"] == "airport"]
+        self.assertEqual(ap[0]["name"], "Testburg International")
+        self.assertIn("TWR 118.1", ap[0]["info"])
+        self.assertEqual(self.app.search("TBG")[0]["kind"], "airport")
+        self.assertEqual(self.app.search("testland")[0]["kind"], "country")
+        near = self.app.nearest(53.1, 6.1, "airport")
+        self.assertEqual([a["name"] for a in near], ["Smallfield", "Testburg International"])
