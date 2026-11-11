@@ -33,4 +33,15 @@
 - Trapping and hunting are illegal for most people in normal times and need skill; consider them only in a genuine long-term survival situation.
 
 ## The "universal edibility test"
-It is slow (24 h per plant part) and **does not detect** many deadly toxins that act after a delay (death cap, hemlock water-dropwort). Prefer the known plants above.
+A last-resort way to try a plant you cannot identify, when you have no other food and expect to be stuck for a long time. It takes about **a day per plant part** and **does not protect** against the worst poisons, which act after many hours or days (death cap, hemlock water-dropwort, autumn crocus, yew). So: **never** test mushrooms, plants with umbrella-shaped flower heads, plants with milky sap, beans and seeds in pods, or anything on the [Deadly plants](page:plants/poisonous-plants) page. Pick a plant that grows in large amounts, so it's worth the effort.
+
+1. **Fast for 8 hours** beforehand (water only) and eat nothing else during the test.
+2. Test **one part** of **one plant** at a time: leaf, stem, root, flower or fruit each count separately.
+3. **Smell** it crushed. Strong bitter or almond (peach-stone) smell: reject.
+4. **Skin**: rub it on the inside of your wrist or elbow for 15 minutes, then wait 8 hours. Burning, itching, rash or swelling: reject.
+5. **Cook** it if possible (boiling destroys some toxins); test it prepared exactly the way you will eat it.
+6. **Lip**: touch a small piece to your lip for 3 minutes. Burning or tingling: reject.
+7. **Tongue**: hold a piece on your tongue for 15 minutes without swallowing. Burning, numbness, very bitter or soapy taste: spit out and rinse.
+8. **Chew** a pinch thoroughly and hold it in your mouth for 15 minutes **without swallowing**. Any bad reaction: spit out and rinse.
+9. **Swallow** that pinch, then wait **8 hours** with nothing else to eat. Nausea, cramps, dizziness, numbness, diarrhoea: make yourself vomit, drink lots of water and don't eat that plant again.
+10. No problems: eat about a **quarter cup** of the same part prepared the same way, wait another 8 hours. Still fine: that part, prepared that way, is probably safe in moderate amounts. Don't assume other parts of the plant are safe.

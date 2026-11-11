@@ -28,7 +28,7 @@ Adults need about **2000–2500 kcal/day**, 3000+ for hard physical work in cold
 ## Preserving
 - **Drying**: thin slices of fruit, vegetables or lean meat, warm airy place or low oven/sun, until leathery. Store airtight.
 - **Salting**: fish or meat packed in salt (about 1:3 salt:meat by weight), then dried.
-- **Smoking**: cold smoke for days to dry, or hot smoke to cook. Combine with salting for keeping.
+- **Smoking**: cut fish or meat in thin strips (about 1 cm), salt them if you can (rub with salt or soak in strong salt water for an hour). Build a rack of green sticks about 1 m above a small fire of **hardwood** (oak, beech, alder, fruit tree; never pine, which makes it bitter), cover the rack with a tent of leafy branches or a tarp to keep the smoke in. Keep the fire low and smoky (add green wood or damp chips), not hot. Turn the strips now and then. After 12–24 hours they should be dry, dark and bend without breaking; store them dry and airy and eat within a few weeks.
 - **Fermenting**: cabbage + 2% salt by weight, packed under its own brine (sauerkraut).
 
 ## Food safety

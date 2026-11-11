@@ -13,6 +13,12 @@ Pain at a point, swelling, bruising, deformity or unusual angle, unable to use i
 5. **Open fracture** (bone through skin): cover with a clean dressing, control bleeding around it, don't push the bone back.
 6. Treat for [Shock](page:firstaid/shock), keep warm, raise the injured limb if possible.
 
+## Making a sling
+Triangle of cloth (a square scarf or shirt folded corner to corner): put the forearm across the chest with the hand slightly higher than the elbow, one end of the triangle over the good shoulder, the long side along the body, bring the bottom end up over the arm to the other shoulder, tie the ends behind the neck at the side. Pin or twist the corner at the elbow. No cloth: pin the sleeve of the injured arm to the shirt, or put the hand inside a buttoned jacket.
+
+## Carrying an injured person
+Only move someone if staying is more dangerous. **Stretcher**: two strong poles 2 m long, slide them through the sleeves of two or three buttoned jackets (turned inside out), or roll a blanket or tarp around the poles from both sides. Test it with an uninjured person first. Carry feet first, keep them warm, swap carriers often. One helper and a walking casualty: walk beside them, their arm over your shoulders, your arm around their waist.
+
 ## Sprains and strains: PRICE
 **P**rotect, **R**est, **I**ce (cold pack wrapped in cloth, 15–20 min every 2–3 h), **C**ompression bandage (not too tight), **E**levate. Gentle movement after 48 h. Can't take any weight or there's a bony tender spot: treat as a fracture.
 
