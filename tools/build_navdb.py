@@ -288,7 +288,8 @@ def add_lo_index(db):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("input", help=".osm.pbf (or .osm) extract, e.g. from download.geofabrik.de")
+    ap.add_argument("input", nargs="+", help=".osm.pbf (or .osm) extract(s), e.g. from download.geofabrik.de; "
+                    "several (netherlands.osm.pbf curacao.osm) go into one map")
     ap.add_argument("output", help="output database, e.g. data/nav.db")
     ap.add_argument("--buildings", action="store_true", help="include building outlines (much bigger)")
     args = ap.parse_args()
@@ -301,14 +302,15 @@ def main():
     db.execute("PRAGMA synchronous=OFF")
     db.executescript(SCHEMA)
 
-    print("Reading %s ..." % args.input, flush=True)
     b = Builder(db, buildings=args.buildings)
-    # 'flex_mem' keeps node locations in RAM; fine for regional/country extracts
-    b.apply_file(args.input, locations=True, idx="flex_mem")
-    db.commit()
+    for f in args.input:
+        print("Reading %s ..." % f, flush=True)
+        # 'flex_mem' keeps node locations in RAM; fine for regional/country extracts
+        b.apply_file(f, locations=True, idx="flex_mem")
+        db.commit()
 
     meta = {
-        "source": os.path.basename(args.input),
+        "source": " + ".join(os.path.basename(f) for f in args.input),
         "built": time.strftime("%Y-%m-%d %H:%M"),
         "bbox": json.dumps(b.bbox),
         "counts": json.dumps(b.n),
