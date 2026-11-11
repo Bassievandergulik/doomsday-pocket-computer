@@ -73,15 +73,7 @@ function show(p) {
   if (p === "info" && !$("#lib-index").innerHTML) loadLibraryIndex();
   if (p === "share") { hotspotRefresh(); meshRefresh(); }
 }
-// tapping the tab you are already on takes you back to that tab's main screen
-function tabHome(p) {
-  if (p === "info" && !$("#lib-page").classList.contains("hidden")) $("#lib-back").onclick();
-  else if (p === "search" && !$("#s-reader").classList.contains("hidden")) findClose();
-  else { const pg = $("#p-" + p); if (pg) pg.scrollTop = 0; }
-}
-document.querySelectorAll("#tabs button[data-p]").forEach(b => b.onclick = () => {
-  if (S.page === b.dataset.p) tabHome(b.dataset.p); else show(b.dataset.p);
-});
+document.querySelectorAll("#tabs button[data-p]").forEach(b => b.onclick = () => show(b.dataset.p));
 $("#night").onclick = () => { document.body.classList.toggle("night"); save("night", document.body.classList.contains("night")); };
 if (load("night")) document.body.classList.add("night");
 
