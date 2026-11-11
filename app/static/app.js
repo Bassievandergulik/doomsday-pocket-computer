@@ -927,3 +927,41 @@ if (view) map.setView(view[0], view[1], view[2]);
 map.overlay.target = S.target;
 loadStatus().then(() => { loadWaypoints(); pollGps(); });
 setInterval(loadStatus, 60000);
+
+// ---------------------------------------------------------------- scroll arrows
+// Dragging a finger on the resistive screen is hit and miss; these buttons scroll by most of a screen.
+function scrollTarget() {
+  // returns [element that scrolls, element that should make room for the arrows]
+  if (!$("#viewer").classList.contains("hidden")) return [$("#v-body"), $("#viewer")];
+  if (S.page === "search" && !$("#s-reader").classList.contains("hidden")) {
+    try {
+      const d = $("#s-frame").contentDocument;
+      if (d && d.scrollingElement && !$("#s-frame").classList.contains("hidden")) return [d.scrollingElement, $("#s-reader")];
+    } catch (e) { /* other origin: no arrows */ }
+    return [null, null];
+  }
+  const pg = $("#p-" + S.page);
+  if (!pg || S.page === "map") return [null, null];
+  return [pg, pg];
+}
+let saRoom = null;
+function scrollArrowsUpdate() {
+  const [el, room] = scrollTarget();
+  const can = el && el.scrollHeight > el.clientHeight + 4;
+  $("#scroll-arrows").classList.toggle("hidden", !can);
+  if (saRoom !== room || !can) { if (saRoom) saRoom.classList.remove("scrolly"); saRoom = null; }
+  if (can) {
+    if (room && !room.classList.contains("scrolly")) { room.classList.add("scrolly"); saRoom = room; }
+    $("#sa-up").disabled = el.scrollTop <= 0;
+    $("#sa-down").disabled = el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
+  }
+}
+function pageScroll(dir) {
+  const [el] = scrollTarget(); if (!el) return;
+  el.scrollTop += dir * Math.max(40, Math.round(el.clientHeight * 0.8));
+  scrollArrowsUpdate();
+}
+$("#sa-up").onclick = () => pageScroll(-1);
+$("#sa-down").onclick = () => pageScroll(1);
+document.addEventListener("scroll", scrollArrowsUpdate, true);
+setInterval(scrollArrowsUpdate, 700);
