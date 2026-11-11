@@ -43,6 +43,9 @@ echo "== Durability: protect the SD card and recover from hangs"
 # logs in RAM instead of constantly writing to the card
 sudo mkdir -p /etc/systemd/journald.conf.d /etc/systemd/system.conf.d
 printf '[Journal]\nStorage=volatile\nRuntimeMaxUse=20M\n' | sudo tee /etc/systemd/journald.conf.d/doomsday.conf >/dev/null
+# keep the on-screen app in RAM: only swap (zram) what is really idle
+echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/90-doomsday.conf >/dev/null
+sudo sysctl -q -p /etc/sysctl.d/90-doomsday.conf
 # no swap file on the SD card
 sudo systemctl disable --now dphys-swapfile 2>/dev/null || true
 # don't write access times on every file read
@@ -115,6 +118,9 @@ ExecStart=/bin/bash $APP_DIR/deploy/kiwix.sh
 Restart=always
 RestartSec=5
 Nice=5
+# kiwix-serve keeps growing its cache with big ZIMs (400 MB after a few searches on the Pi 3 B+),
+# which pushes the kiosk browser into swap and makes taps lag. Make the kernel reclaim kiwix first.
+MemoryHigh=200M
 
 [Install]
 WantedBy=multi-user.target
