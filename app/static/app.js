@@ -783,6 +783,7 @@ $("#lib-index").onclick = (e) => {
 };
 $("#lib-body").onclick = (e) => { const id = e.target.dataset.page; if (id) { e.preventDefault(); openPage(id); } };
 let libIndexScroll = 0;
+$("#p-info").addEventListener("scroll", () => $("#lib-page").classList.toggle("scrolled", $("#p-info").scrollTop > 30));
 $("#lib-back").onclick = () => {
   $("#lib-page").classList.add("hidden"); $("#lib-index").classList.remove("hidden");
   $("#p-info").scrollTop = libIndexScroll;  // back to where you were in the list
