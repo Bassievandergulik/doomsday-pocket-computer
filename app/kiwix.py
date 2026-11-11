@@ -52,7 +52,8 @@ class Kiwix:
             if time.time() - self._books_t < max_age:
                 return self._books
             try:
-                status, body = self._get("/catalog/v2/entries?count=-1", timeout=3)
+                # a busy kiwix-serve (big search running, memory cap) can take a few seconds
+                status, body = self._get("/catalog/v2/entries?count=-1", timeout=10)
                 out = []
                 if status == 200:
                     for e in ET.fromstring(body).iter(ATOM + "entry"):
@@ -71,10 +72,14 @@ class Kiwix:
                                     "lang": LANG3.get(lang3, lang3[:2]), "category": e.findtext(ATOM + "category") or "",
                                     "articles": _int(e.findtext(ATOM + "articleCount")),
                                     "url": "%s/content/%s/" % (self.root, quote(name))})
+                if status != 200:
+                    raise OSError("catalog: HTTP %s" % status)
                 self._books = out
+                self._books_t = time.time()
             except (OSError, ET.ParseError, ValueError):
-                self._books = []
-            self._books_t = time.time()
+                # keep the list we had (kiwix restarting or busy) and ask again next time,
+                # instead of saying "no Wikipedia installed" for a whole minute
+                self._books_t = 0
             return self._books
 
     def available(self):
