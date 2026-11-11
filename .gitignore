@@ -1,5 +1,6 @@
 # Runtime data and large offline content (copy to the SD card, never commit)
 data/
+!tests/data/
 *.zim
 *.mbtiles
 *.osm.pbf

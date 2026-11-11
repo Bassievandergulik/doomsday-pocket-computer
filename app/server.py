@@ -236,6 +236,14 @@ class App:
             self._local.nav = db
         return db
 
+    def _has_minz_index(self, db):
+        """nav.db built by tools/build_navdb.py since 2026-11 has indexes on minz."""
+        has = getattr(self._local, "minz_idx", None)
+        if has is None:
+            names = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='index'")}
+            has = self._local.minz_idx = {"lines_minz", "areas_minz"} <= names
+        return has
+
     def mbtiles(self):
         if not os.path.exists(self.mbtiles_path):
             return None
@@ -285,15 +293,19 @@ class App:
         mx, my = (e - w) * 0.05, (n - s) * 0.05
         args = (dz, w - mx, e + mx, s - my, n + my)
         col = "COALESCE(geom_lo, geom)" if dz < 12 else "geom"
+        # Zoomed out, the tile covers most of the country but few features are shown: walk the
+        # minz index and check each row's box, instead of reading every feature in the box from
+        # the R-tree and then dropping most of them (40+ s per tile on the Pi for a country map).
+        join = "CROSS JOIN" if dz <= 9 and self._has_minz_index(db) else "JOIN"
         out = {"lines": [], "areas": [], "places": [], "pois": []}
         for cls, name, g in db.execute(
-                "SELECT t.cls, t.name, %s FROM areas t JOIN areas_idx i ON t.id=i.id "
-                "WHERE t.minz<=? AND i.maxx>=? AND i.minx<=? AND i.maxy>=? AND i.miny<=? LIMIT 4000" % col,
+                "SELECT t.cls, t.name, %s FROM areas t %s areas_idx i ON t.id=i.id "
+                "WHERE t.minz<=? AND i.maxx>=? AND i.minx<=? AND i.maxy>=? AND i.miny<=? LIMIT 4000" % (col, join),
                 (args[0], args[1], args[2], args[3], args[4])):
             out["areas"].append([cls, geo.decode(g)])
         for cls, name, g in db.execute(
-                "SELECT t.cls, t.name, %s FROM lines t JOIN lines_idx i ON t.id=i.id "
-                "WHERE t.minz<=? AND i.maxx>=? AND i.minx<=? AND i.maxy>=? AND i.miny<=? LIMIT 8000" % col,
+                "SELECT t.cls, t.name, %s FROM lines t %s lines_idx i ON t.id=i.id "
+                "WHERE t.minz<=? AND i.maxx>=? AND i.minx<=? AND i.maxy>=? AND i.miny<=? LIMIT 8000" % (col, join),
                 (args[0], args[1], args[2], args[3], args[4])):
             out["lines"].append([cls, name if z >= 15 else None, geo.decode(g)])
         for kind, name, lon, lat in db.execute(
