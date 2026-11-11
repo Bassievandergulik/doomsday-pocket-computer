@@ -73,7 +73,15 @@ function show(p) {
   if (p === "info" && !$("#lib-index").innerHTML) loadLibraryIndex();
   if (p === "share") { hotspotRefresh(); meshRefresh(); }
 }
-document.querySelectorAll("#tabs button[data-p]").forEach(b => b.onclick = () => show(b.dataset.p));
+// tapping the tab you are already on takes you back to that tab's main screen
+function tabHome(p) {
+  if (p === "info" && !$("#lib-page").classList.contains("hidden")) $("#lib-back").onclick();
+  else if (p === "search" && !$("#s-reader").classList.contains("hidden")) findClose();
+  else { const pg = $("#p-" + p); if (pg) pg.scrollTop = 0; }
+}
+document.querySelectorAll("#tabs button[data-p]").forEach(b => b.onclick = () => {
+  if (S.page === b.dataset.p) tabHome(b.dataset.p); else show(b.dataset.p);
+});
 $("#night").onclick = () => { document.body.classList.toggle("night"); save("night", document.body.classList.contains("night")); };
 if (load("night")) document.body.classList.add("night");
 
@@ -773,6 +781,7 @@ async function loadLibraryIndex() {
 async function openPage(id) {
   const p = await api("/api/library/page?id=" + encodeURIComponent(id));
   $("#lib-body").innerHTML = p.html || "Not found";
+  if (!$("#lib-index").classList.contains("hidden")) libIndexScroll = $("#p-info").scrollTop;
   $("#lib-index").classList.add("hidden"); $("#lib-page").classList.remove("hidden");
   $("#p-info").scrollTop = 0;
 }
@@ -781,7 +790,11 @@ $("#lib-index").onclick = (e) => {
   const id = e.target.dataset.page; if (id) openPage(id);
 };
 $("#lib-body").onclick = (e) => { const id = e.target.dataset.page; if (id) { e.preventDefault(); openPage(id); } };
-$("#lib-back").onclick = () => { $("#lib-page").classList.add("hidden"); $("#lib-index").classList.remove("hidden"); };
+let libIndexScroll = 0;
+$("#lib-back").onclick = () => {
+  $("#lib-page").classList.add("hidden"); $("#lib-index").classList.remove("hidden");
+  $("#p-info").scrollTop = libIndexScroll;  // back to where you were in the list
+};
 let libSize = load("libSize") || 15;
 const applySize = () => { $("#lib-body").style.fontSize = libSize + "px"; save("libSize", libSize); };
 $("#lib-bigger").onclick = () => { libSize = Math.min(24, libSize + 1); applySize(); };

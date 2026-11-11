@@ -183,3 +183,5 @@ body.osk-open #scroll-arrows { display: none; }
 #lib-body img.sign { height: 44px; vertical-align: middle; }
 #lib-body .flag { font-size: 30px; line-height: 1; font-family: "Noto Color Emoji", sans-serif; }
 #lib-body img.photo { display: block; width: 100%; max-width: 420px; border-radius: 6px; margin: 4px 0 8px; }
+/* the guide's Back / A- / A+ bar stays at the top while you scroll a page */
+#lib-page > .row { position: sticky; top: -8px; z-index: 3; background: var(--bg); margin: -8px 0 6px; padding: 8px 0 4px; }
