@@ -5,9 +5,10 @@
  * Wayland kiosk (cage) can't draw on. The same panel works with the mainline tinydrm "ili9486"
  * driver (compatible "waveshare,rpi-lcd-35"), which shows up as a normal /dev/dri/card device.
  * Pins are taken from Waveshare's overlay: DC = GPIO24, RESET = GPIO25,
- * touch pen-down = GPIO17, display on CE0, touch on CE1. SPI runs at 24 MHz (works on
- * the real Pi 3 B+; Waveshare uses 15 MHz). If the screen stays white, add ",speed=15000000"
- * to the dtoverlay line in config.txt.
+ * touch pen-down = GPIO17, display on CE0, touch on CE1. SPI runs at 16 MHz: at 24 MHz a
+ * properly powered Pi 3 B+ sends damaged pixels (speckled, unclear text); it only looked
+ * clean while under-powered and slowed down. Waveshare uses 15 MHz. To change it, add
+ * e.g. ",speed=15000000" to the dtoverlay line in config.txt.
  *
  * Built and installed by deploy/screen.sh:
  *   dtc -@ -I dts -O dtb -o waveshare35b-drm.dtbo waveshare35b-drm.dts
@@ -60,7 +61,7 @@
 				reg = <0>;
 				pinctrl-names = "default";
 				pinctrl-0 = <&ws35b_pins>;
-				spi-max-frequency = <24000000>;
+				spi-max-frequency = <16000000>;
 				/* 180 = the same landscape orientation as Waveshare's "rotate=90" (MADCTL 0x28) */
 				rotation = <180>;
 				reset-gpios = <&gpio 25 0>; /* active high for the DRM driver */
