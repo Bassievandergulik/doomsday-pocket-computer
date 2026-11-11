@@ -961,7 +961,7 @@ function scrollArrowsUpdate() {
 }
 function pageScroll(dir) {
   const [el] = scrollTarget(); if (!el) return;
-  el.scrollTop += dir * Math.max(40, Math.round(el.clientHeight * 0.65));
+  el.scrollTop += dir * 100;  // about 1.5 cm on the 3.5" screen (6.5 px per mm)
   scrollArrowsUpdate();
 }
 $("#sa-up").onclick = () => pageScroll(-1);
