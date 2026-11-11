@@ -961,7 +961,7 @@ function scrollArrowsUpdate() {
 }
 function pageScroll(dir) {
   const [el] = scrollTarget(); if (!el) return;
-  el.scrollTop += dir * Math.max(40, Math.round(el.clientHeight * 0.5));
+  el.scrollTop += dir * Math.max(40, Math.round(el.clientHeight * 0.75));
   scrollArrowsUpdate();
 }
 $("#sa-up").onclick = () => pageScroll(-1);
