@@ -53,6 +53,8 @@ sudo sed -i -E '/[[:space:]]\/[[:space:]]/ { /noatime/! s/(ext4[[:space:]]+)([^[
 # repair the file system automatically after a power cut
 CMDLINE=/boot/firmware/cmdline.txt; [ -f "$CMDLINE" ] || CMDLINE=/boot/cmdline.txt
 grep -q 'fsck.repair=yes' "$CMDLINE" || sudo sed -i 's/$/ fsck.repair=yes/' "$CMDLINE"
+# the Pi kernel turns memory accounting off by default; kiwix.service's MemoryHigh needs it
+grep -q 'cgroup_enable=memory' "$CMDLINE" || sudo sed -i 's/$/ cgroup_enable=memory/' "$CMDLINE"
 # hardware watchdog: reboot by itself if the system ever freezes
 printf '[Manager]\nRuntimeWatchdogSec=15\n' | sudo tee /etc/systemd/system.conf.d/doomsday-watchdog.conf >/dev/null
 # allow the app to shut down cleanly when the battery runs out
