@@ -23,6 +23,7 @@
 - **Hemlock & hemlock water-dropwort** (white umbrella flowers, purple-blotched stems): avoid **all** carrot-family plants with umbrella flowers.
 - **Foxglove**, **monkshood**, **deadly nightshade** (shiny black berries), **yew**, **lily of the valley**, **autumn crocus**, **cuckoo pint / lords-and-ladies** (red berry spike).
 - Unknown white or red berries: assume poisonous.
+- **Mushrooms**: don't eat wild mushrooms unless an experienced person identified that exact species. The **death cap** and **destroying angel** (white gills, ring on the stem, cup at the base) kill with liver failure after a quiet day or two, and cooking doesn't help. They give few calories anyway.
 
 ## Animal food
 - Fish: line and hook, worms or insects as bait. Check fishing rules while they still apply.

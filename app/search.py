@@ -231,7 +231,9 @@ class TextIndex:
                                                    for k in range(1, len(tk))):
                                 cnt += 1
                                 first = i if first is None else min(first, i)
-                    if any(w in d["title_tok"] for w in firsts):
+                    # title bonus: every word of the phrase in the title ("cold exposure" is not "Cold, snow and ice")
+                    if any(w in d["title_tok"] for w in firsts) and all(
+                            any(stem_match(t, x) for x in d["title_tok"]) for t in tk[1:]):
                         cnt += 20
                 if cnt:
                     matched += 1
