@@ -754,14 +754,11 @@ class BuilderTest(unittest.TestCase):
             self.assertEqual(db.execute("SELECT count(*) FROM pois").fetchone()[0], 3)
             self.assertEqual(db.execute("SELECT name FROM search WHERE search MATCH 'tests*'").fetchone()[0],
                              "Teststad")
-            # minz indexes for fast zoomed-out tiles; both join orders give the same features
-            names = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='index'")}
-            self.assertLessEqual({"lines_minz", "areas_minz"}, names)
-            q = ("SELECT t.id FROM lines t %s lines_idx i ON t.id=i.id WHERE t.minz<=? AND i.maxx>=? "
-                 "AND i.minx<=? AND i.maxy>=? AND i.miny<=? ORDER BY t.id")
-            a = (20, -180, 180, -90, 90)
-            self.assertEqual(db.execute(q % "JOIN", a).fetchall(), db.execute(q % "CROSS JOIN", a).fetchall())
-            self.assertTrue(db.execute(q % "JOIN", a).fetchall())
+            # small R-trees for fast zoomed-out tiles hold exactly the features with minz <= 9
+            for t in ("lines", "areas"):
+                self.assertEqual(
+                    db.execute("SELECT count(*) FROM %s_lo_idx" % t).fetchone()[0],
+                    db.execute("SELECT count(*) FROM %s WHERE minz<=9" % t).fetchone()[0])
 
 
 

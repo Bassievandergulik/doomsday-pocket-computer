@@ -272,6 +272,20 @@ class Builder(osmium.SimpleHandler):
         self._progress()
 
 
+LO_IDX_ZOOM = 9
+
+
+def add_lo_index(db):
+    """Small R-trees with only the features shown up to zoom 9, so zoomed-out map tiles don't
+    have to read (and throw away) every road in the country. Safe to run on an existing nav.db."""
+    for t in ("lines", "areas"):
+        db.execute("DROP TABLE IF EXISTS %s_lo_idx" % t)
+        db.execute("CREATE VIRTUAL TABLE %s_lo_idx USING rtree(id, minx, maxx, miny, maxy)" % t)
+        db.execute("INSERT INTO %s_lo_idx SELECT i.id, i.minx, i.maxx, i.miny, i.maxy FROM %s_idx i "
+                   "JOIN %s t ON t.id=i.id WHERE t.minz<=?" % (t, t, t), (LO_IDX_ZOOM,))
+    db.commit()
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("input", help=".osm.pbf (or .osm) extract, e.g. from download.geofabrik.de")
@@ -303,9 +317,7 @@ def main():
     db.executemany("INSERT INTO meta VALUES(?,?)", meta.items())
     db.commit()
     print("Optimising ...", flush=True)
-    # lets the app draw zoomed-out tiles quickly (few features, large area)
-    db.execute("CREATE INDEX lines_minz ON lines(minz)")
-    db.execute("CREATE INDEX areas_minz ON areas(minz)")
+    add_lo_index(db)
     db.execute("INSERT INTO search(search) VALUES('optimize')")
     db.commit()
     db.execute("VACUUM")
