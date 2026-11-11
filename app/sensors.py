@@ -87,33 +87,66 @@ class BME680:
 
 
 class UVSensor:
-    """LTR390 UV index sensor (I2C 0x53). The index is approximate: calibrated for
-    the common gain setting, not against a reference meter. Untested on hardware."""
+    """LTR390 UV index sensor. Two boards work:
+    - a bare LTR390 breakout at I2C 0x53 (registers of the chip itself);
+    - DFRobot Gravity LTR390 (SEN0540) at 0x1C, which has its own microcontroller in front
+      of the chip: 16-bit registers, sent low byte first, written at register + 5
+      (DFRobot_LTR390UV library). Set its I2C/UART switch to I2C.
+    Both are set to gain x18, 18-bit (100 ms). The UV index is approximate (datasheet
+    sensitivity, not checked against a reference meter)."""
 
     ADDR = 0x53
+    DFROBOT_ADDR = 0x1C
+    # datasheet: 2300 counts per UV index at gain x18 and 20-bit (400 ms); 18-bit counts 4x less
+    COUNTS_PER_UVI = 2300.0 / 4
 
     def __init__(self, bus):
         self.bus = bus
         self.available = False
+        self.addr = None
         if bus is None:
             return
         try:
-            if bus.read_byte_data(self.ADDR, 0x06) != 0xB2:  # part ID
-                return
-            bus.write_byte_data(self.ADDR, 0x00, 0x0A)  # UVS mode, enabled
-            bus.write_byte_data(self.ADDR, 0x05, 0x03)  # gain x18
-            bus.write_byte_data(self.ADDR, 0x04, 0x20)  # 18-bit, 100 ms
-            self.available = True
+            if bus.read_byte_data(self.ADDR, 0x06) == 0xB2:  # part ID
+                bus.write_byte_data(self.ADDR, 0x00, 0x0A)  # UVS mode, enabled
+                bus.write_byte_data(self.ADDR, 0x05, 0x04)  # gain x18
+                bus.write_byte_data(self.ADDR, 0x04, 0x22)  # 18-bit, 100 ms
+                self.addr = self.ADDR
         except OSError:
             pass
+        if self.addr is None:
+            try:
+                if (self._df_read(0x06, 1)[0] & 0xFF) == 0xB2:  # part ID of the LTR390 behind the controller
+                    self._df_write(0x06, 4)      # gain x18
+                    self._df_write(0x0D, 0x22)   # 18-bit, 100 ms
+                    self._df_write(0x0E, 0x0A)   # UVS mode, enabled
+                    self.addr = self.DFROBOT_ADDR
+            except OSError:
+                pass
+        self.available = self.addr is not None
+
+    def _df_read(self, reg, words):
+        d = self.bus.read_i2c_block_data(self.DFROBOT_ADDR, reg, 2 * words)
+        return [d[2 * i] | (d[2 * i + 1] << 8) for i in range(words)]
+
+    def _df_write(self, reg, value):
+        self.bus.write_i2c_block_data(self.DFROBOT_ADDR, reg + 5, [value & 0xFF, value >> 8])
+
+    def raw(self):
+        if self.addr == self.ADDR:
+            d = self.bus.read_i2c_block_data(self.ADDR, 0x10, 3)
+            return d[0] | (d[1] << 8) | (d[2] << 16)
+        lo, hi = self._df_read(0x09, 2)
+        return lo | (hi << 16)
 
     def index(self):
         """UV index (0 at night), or None."""
         if not self.available:
             return None
-        d = self.bus.read_i2c_block_data(self.ADDR, 0x10, 3)
-        raw = d[0] | (d[1] << 8) | (d[2] << 16)
-        return round(raw / 2300.0, 1)  # approximate counts per UV index unit at x18 gain
+        try:
+            return round(self.raw() / self.COUNTS_PER_UVI, 1)
+        except OSError:
+            return None
 
 
 class BME280:

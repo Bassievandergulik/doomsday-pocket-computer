@@ -486,8 +486,24 @@ class AirAndUvTest(unittest.TestCase):
             def read_i2c_block_data(self, a, r, n): return [0x40, 0x0D, 0x03]  # raw 0x030D40
         uv = sensors.UVSensor(Bus())
         self.assertTrue(uv.available)
-        self.assertAlmostEqual(uv.index(), round(0x030D40 / 2300.0, 1))
+        self.assertAlmostEqual(uv.index(), round(0x030D40 / 575.0, 1))
         self.assertFalse(sensors.UVSensor(None).available)
+
+    def test_uv_index_from_fake_dfrobot_board(self):
+        import sensors
+
+        class Bus:  # DFRobot SEN0540 at 0x1C: nothing at 0x53, 16-bit registers low byte first
+            writes = []
+            def read_byte_data(self, a, r): raise OSError(121, "no device")
+            def write_i2c_block_data(self, a, r, d): self.writes.append((a, r, d))
+            def read_i2c_block_data(self, a, r, n):
+                assert a == 0x1C
+                return {0x06: [0xB2, 0x00], 0x09: [0x3E, 0x02, 0x01, 0x00]}[r][:n]  # UVS 0x1023E
+        bus = Bus()
+        uv = sensors.UVSensor(bus)
+        self.assertTrue(uv.available)
+        self.assertIn((0x1C, 0x0E + 5, [0x0A, 0x00]), bus.writes)  # UV mode
+        self.assertAlmostEqual(uv.index(), round(0x1023E / 575.0, 1))
 
     def test_bme680_absent_is_harmless(self):
         import sensors
