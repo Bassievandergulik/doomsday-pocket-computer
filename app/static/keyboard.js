@@ -42,7 +42,15 @@ const OSK = (() => {
     el.classList.remove("hidden");
     document.body.classList.add("osk-open");
   }
+  // The finger that pressed ↵ or ✕ lifts after the keyboard is gone, and the browser then
+  // "clicks" whatever is under it (the night-mode button sits under ↵). Swallow that one click.
+  let swallowUntil = 0;
+  document.addEventListener("click", (e) => {
+    if (Date.now() < swallowUntil) { e.preventDefault(); e.stopPropagation(); swallowUntil = 0; }
+  }, true);
+
   function close(ok) {
+    swallowUntil = Date.now() + 600;
     el.classList.add("hidden");
     document.body.classList.remove("osk-open");
     const val = field.value;
@@ -61,7 +69,7 @@ const OSK = (() => {
   // Press highlights the key, release types it. A resistive screen's first reading of a touch is
   // the least accurate one, so typing on release (where the finger settled) hits the right key
   // more often; sliding off a key before lifting cancels it.
-  let pressed = null;
+  let pressed = null, lastKey = null, lastAt = 0;
   el.addEventListener("pointerdown", (e) => {
     e.preventDefault();  // keep focus, no ghost clicks
     const b = e.target.closest("button");
@@ -81,6 +89,10 @@ const OSK = (() => {
     b.classList.remove("down");
     e.preventDefault();
     const k = b.dataset.k;
+    // the resistive screen sometimes reports one tap as two very quick ones: ignore the echo
+    const now = Date.now();
+    if (k === lastKey && now - lastAt < 130) return;
+    lastKey = k; lastAt = now;
     if (k === "cancel") return close(false);
     if (k === "↵") return close(true);
     if (k === "⌫") field.value = field.value.slice(0, -1);

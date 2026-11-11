@@ -163,6 +163,11 @@ class EndToEndTest(unittest.TestCase):
         self.assertIn("wikipedia_en_all_maxi_2026-01", [b.get("name") for b in d["books"]])
         w = json.loads(self.get("/api/find/wiki?book=wikipedia_en_all_maxi_2026-01&q=skin")[1])
         self.assertEqual([x["title"] for x in w["results"]], ["Burn"])  # full-text only: no title starts with "skin"
+        # the exact article comes first, also when typed without the ç (a redirect in the ZIM)
+        w = json.loads(self.get("/api/find/wiki?book=wikipedia_en_all_maxi_2026-01&q=curacao")[1])
+        self.assertEqual(w["results"][0]["title"], "Curaçao")
+        self.assertTrue(w["results"][0]["title_match"])
+        self.assertEqual(self.get(w["results"][0]["url"])[0].status, 200)
 
     def test_map_concepts(self):
         d = json.loads(self.get("/api/find?q=" + quote("hospital"))[1])

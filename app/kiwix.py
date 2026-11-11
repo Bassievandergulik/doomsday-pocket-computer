@@ -87,11 +87,10 @@ class Kiwix:
 
     def suggest(self, book, term, count=6):
         """Fast title matches."""
-        q = urlencode({"books.name": book, "term": term, "count": count})
-        status, body = self._get("/suggest?" + q, timeout=8)
+        # kiwix-serve 3.8 only knows content= (books.name= gives 404); some versions the other way round
+        status, body = self._get("/suggest?" + urlencode({"content": book, "term": term, "count": count}), timeout=8)
         if status != 200:
-            # kiwix-serve before 3.3 only knows content=
-            status, body = self._get("/suggest?" + urlencode({"content": book, "term": term, "count": count}), timeout=8)
+            status, body = self._get("/suggest?" + urlencode({"books.name": book, "term": term, "count": count}), timeout=8)
         if status != 200:
             return []
         out = []
@@ -125,11 +124,50 @@ class Kiwix:
                         "words": _int(it.findtext("wordCount"))})
         return {"total": total or len(res), "results": res}
 
+    def exact(self, book, query):
+        """The article whose title is exactly the query ("curacao" -> Curaçao), or None.
+        Asking for the page directly takes milliseconds; in the 52 GB English Wikipedia the
+        title suggestions take up to 40 s and rank "Germany to germany" above "Germany"."""
+        q = " ".join(query.split())
+        if not q or len(q) > 80:
+            return None
+        tries = []
+        for t in (q[:1].upper() + q[1:], q.title()):
+            if t not in tries:
+                tries.append(t)
+        for t in tries:
+            path = "/content/%s/%s" % (quote(book), quote(t.replace(" ", "_")))
+            try:
+                c = http.client.HTTPConnection(self.host, self.port, timeout=6)
+                try:
+                    c.request("GET", self.root + path)
+                    r = c.getresponse()
+                    loc = r.getheader("Location") or ""
+                    r.read(0)
+                    status = r.status
+                finally:
+                    c.close()
+            except OSError:
+                return None
+            if status == 200:
+                return {"title": t, "url": self.root + path}
+            if status in (301, 302) and loc:
+                if not loc.startswith("/"):
+                    loc = "%s/content/%s/%s" % (self.root, quote(book), loc)
+                last = unquote(loc.rstrip("/").rsplit("/", 1)[-1]).replace("_", " ")
+                if last and "/content/%s/" % quote(book) in loc and loc.rstrip("/") != "%s/content/%s" % (self.root, quote(book)):
+                    return {"title": last, "url": loc}
+        return None
+
     def find(self, book, query, count=8):
-        """Title matches first (they are usually the article you want), then full-text hits."""
+        """The exact article first, then title matches, then full-text hits."""
         out, seen, err = [], set(), None
+        ex = self.exact(book, query)
+        if ex:
+            seen.add(ex["url"])
+            out.append(dict(ex, snippet="", title_match=True))
         try:
-            for s in self.suggest(book, query, 4):
+            for s in ([] if ex else self.suggest(book, query, 4)):  # the exact hit makes the slow suggestions unneeded
                 seen.add(s["url"])
                 out.append(dict(s, snippet="", title_match=True))
         except (OSError, ValueError):

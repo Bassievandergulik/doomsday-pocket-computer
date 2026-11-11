@@ -5,17 +5,20 @@ text/html link, and numbers come with thousands separators."""
 import http.server
 import json
 import threading
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import unquote, parse_qs, urlparse
 
 BOOKS = [("wikipedia_en_all_maxi_2026-01", "Wikipedia", "eng"),
          ("wikipedia_es_all_nopic_2026-01", "Wikipedia (español)", "spa"),
          ("wikimed_nl_2026-01", "WikiMed", "nld")]
 ARTICLES = {
     "wikipedia_en_all_maxi_2026-01": {"Burn": "A burn is an injury to skin caused by heat, cold, electricity...",
-                                      "Burns_Night": "Burns Night is a celebration of the poet Robert Burns."},
+                                      "Burns_Night": "Burns Night is a celebration of the poet Robert Burns.",
+                                      "Curaçao": "Curaçao is an island in the southern Caribbean Sea."},
     "wikipedia_es_all_nopic_2026-01": {"Quemadura": "Una quemadura es un tipo de lesión en la piel..."},
     "wikimed_nl_2026-01": {"Brandwond": "Een brandwond is een beschadiging van de huid..."},
 }
+
+REDIRECTS = {"Curacao": "Cura%C3%A7ao"}  # relative, as kiwix-serve sends it
 
 
 def catalog():
@@ -70,7 +73,9 @@ xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/"><channel><title>Search</
             if len(rest) == 1 or not rest[1]:
                 first = sorted(ARTICLES[book])[0]
                 return self._out(302, "", extra=[("Location", "/kiwix/content/%s/%s" % (book, first))])
-            txt = ARTICLES.get(book, {}).get(rest[1])
+            if rest[1] in REDIRECTS:  # like Wikipedia's redirect pages: Curacao -> Curaçao
+                return self._out(302, "", extra=[("Location", REDIRECTS[rest[1]])])
+            txt = ARTICLES.get(book, {}).get(unquote(rest[1]))
             if txt is None:
                 return self._out(404, "not found")
             return self._out(200, "<html><body><h1>%s</h1><p>%s</p></body></html>" % (rest[1], txt))
