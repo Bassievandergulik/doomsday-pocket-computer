@@ -25,6 +25,8 @@ const POI_STYLE = {
   toilet: ["#00838f", "WC"], phone: ["#6a1b9a", "☎"], peak: ["#4e342e", "▲"], cave: ["#3e2723", "C"],
 };
 
+const WORLD_SEA = "#a9cbe6", WORLD_LAND = "#efebe3", WORLD_EDGE = "#8f8778";
+
 function lon2x(lon, z) { return (lon + 180) / 360 * TILE * Math.pow(2, z); }
 function lat2y(lat, z) {
   const s = Math.sin(lat * Math.PI / 180);
@@ -182,6 +184,18 @@ class OfflineMap {
       this._rasterDraw(ctx, z - 1, x >> 1, y >> 1, (x & 1) * 128 + sx / 2, (y & 1) * 128 + sy / 2, sw / 2, dx, dy, ds);
   }
 
+  // the airport drawn nearest to a map point, if one is within a finger's width
+  airportNear(lat, lon, px = 30) {
+    const z = this.zoom, ox = lon2x(this.lon, z) - this.w / 2, oy = lat2y(this.lat, z) - this.h / 2;
+    const x = lon2x(lon, z) - ox, y = lat2y(lat, z) - oy;
+    let best = null, bd = px;
+    for (const [ax, ay, a] of this._airports || []) {
+      const d = Math.hypot(ax - x, ay - y);
+      if (d < bd) { bd = d; best = { icao: a[0], name: a[1], lon: a[3], lat: a[4], info: a[5] }; }
+    }
+    return best;
+  }
+
   redraw() {
     if (this._pending) return;
     this._pending = true;
@@ -201,14 +215,18 @@ class OfflineMap {
     const x0 = Math.floor(ox / ts), x1 = Math.floor((ox + w) / ts);
     const y0 = Math.floor(oy / ts), y1 = Math.floor((oy + h) / ts);
     const n = Math.pow(2, tz);
-    const visible = [];
+    const visible = [], worldTiles = [];
     for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
       if (y < 0 || y >= n) continue;
       const xx = ((x % n) + n) % n;
       const key = tz + "/" + xx + "/" + y;
       const d = this.tiles.get(key);
       if (d === undefined) this._fetchTile(key);
-      else if (d !== "loading") visible.push(d);
+      else if (d !== "loading") {
+        visible.push(d);
+        // (x - xx) * ts shifts tiles of the next/previous copy of the world when the map wraps
+        if (d.world) worldTiles.push([d.world, x * ts - ox, y * ts - oy, (x - xx) * ts]);
+      }
     }
 
     if (this.useRaster) {
@@ -227,6 +245,25 @@ class OfflineMap {
       }
       if (close) ctx.closePath();
     };
+
+    // rough world map (sea, land, lakes) under the detailed map, each tile clipped to its square
+    if (!this.useRaster) {
+      for (const [wd, tx, ty, shift] of worldTiles) {
+        ctx.save();
+        ctx.beginPath(); ctx.rect(tx, ty, ts + 0.5, ts + 0.5); ctx.clip();
+        ctx.fillStyle = WORLD_SEA; ctx.fillRect(tx, ty, ts + 0.5, ts + 0.5);
+        ctx.translate(shift, 0);
+        for (const [layer, fill] of [["land", WORLD_LAND], ["lakes", WORLD_SEA]]) {
+          for (const poly of wd[layer]) {
+            ctx.beginPath();
+            for (const ring of poly) path(ring, true);
+            ctx.fillStyle = fill; ctx.fill("evenodd");
+            ctx.strokeStyle = layer === "land" ? WORLD_EDGE : "#7fa9cf"; ctx.lineWidth = 0.8; ctx.stroke();
+          }
+        }
+        ctx.restore();
+      }
+    }
 
     // areas
     if (!this.useRaster) {
@@ -302,6 +339,48 @@ class OfflineMap {
     // place labels, larger places first, skip overlaps
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     const boxes = [];
+    const label = (text, x, y, font, color, halo) => {
+      ctx.font = font;
+      const tw = ctx.measureText(text).width, fs = parseInt(font.match(/(\d+)px/)[1]);
+      const b = [x - tw / 2 - 2, y - fs / 2 - 2, x + tw / 2 + 2, y + fs / 2 + 2];
+      if (boxes.some(o => b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1])) return false;
+      boxes.push(b);
+      if (halo) { ctx.strokeStyle = halo; ctx.lineWidth = 3; ctx.strokeText(text, x, y); }
+      ctx.fillStyle = color; ctx.fillText(text, x, y);
+      return true;
+    };
+    // country and sea names
+    const seenLbl = new Set();
+    for (const [wd] of worldTiles) for (const l of wd.labels) {
+      if (seenLbl.has(l[1])) continue;
+      seenLbl.add(l[1]);
+      const [x, y] = P(l[2], l[3]);
+      if (l[0] === "country") label(l[1], x, y, "bold 12px sans-serif", "#4a4238", "rgba(255,255,255,.8)");
+      else label(l[1], x, y, "italic 11px serif", "#2f5f8a", null);
+    }
+    // airports: plane symbol, ICAO code next to it. Zoomed out they are small dots that
+    // do not cover each other or the names.
+    this._airports = [];
+    const seenAp = new Set(), dots = [];
+    for (const t of visible) for (const a of (t.airports || [])) {
+      if (seenAp.has(a[0])) continue;
+      seenAp.add(a[0]);
+      const [x, y] = P(a[3], a[4]);
+      if (x < -20 || y < -20 || x > w + 20 || y > h + 20) continue;
+      const big = a[2] === "large", small = z < 8;
+      const r = small ? (big ? 4.5 : 3.5) : (big ? 8 : 6.5);
+      if (small && dots.some(d => Math.hypot(d[0] - x, d[1] - y) < 12)) continue;
+      dots.push([x, y]);
+      this._airports.push([x, y, a]);
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 7);
+      ctx.fillStyle = big ? "#5e35b1" : "#7e57c2"; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke();
+      if (!small) { ctx.fillStyle = "#fff"; ctx.font = (big ? 11 : 9) + "px sans-serif"; ctx.fillText("✈", x, y + 0.5); }
+      if (z >= 8 || (big && z >= 6)) {
+        const text = a[0] + (z >= 10 ? "  " + a[1] : "");
+        ctx.font = "bold 10px sans-serif";
+        label(text, x + r + 3 + ctx.measureText(text).width / 2, y, ctx.font, "#4527a0", "rgba(255,255,255,.85)");
+      }
+    }
     const size = { city: 16, town: 14, village: 12, suburb: 12, hamlet: 11 };
     const places = [];
     for (const t of visible) for (const p of t.places) places.push(p);

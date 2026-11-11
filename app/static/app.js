@@ -102,10 +102,14 @@ function updateMapInfo() {
 
 let menuAt = null;
 map.onLongPress = (lat, lon) => {
-  menuAt = { lat, lon };
+  const ap = map.airportNear(lat, lon);
+  if (ap) { lat = ap.lat; lon = ap.lon; }
+  menuAt = { lat, lon, name: ap ? ap.name : null };
   const p = myPos();
-  $("#mm-title").textContent = lat.toFixed(5) + ", " + lon.toFixed(5) +
-    (p ? "  ·  " + fmtDist(haversine(p, menuAt)) + " " + cardinal(bearing(p, menuAt)) : "");
+  $("#mm-title").textContent = [ap ? "✈ " + ap.name : lat.toFixed(5) + ", " + lon.toFixed(5),
+    p ? fmtDist(haversine(p, menuAt)) + " " + cardinal(bearing(p, menuAt)) : ""].filter(Boolean).join("  ·  ");
+  $("#mm-info").textContent = ap ? ap.info : "";
+  $("#mm-info").classList.toggle("hidden", !ap);
   $("#map-menu").classList.remove("hidden");
   map.overlay.marks = [{ lat, lon, mark: true }]; map.redraw();
 };
@@ -115,12 +119,12 @@ $("#map-menu").onclick = async (e) => {
   $("#map-menu").classList.add("hidden");
   map.overlay.marks = [];
   if (act === "wp") {
-    const name = await askText("Waypoint name", "");
+    const name = await askText("Waypoint name", menuAt.name || "");
     if (name === null) { map.redraw(); return; }
     await api("/api/waypoints", { lat: menuAt.lat, lon: menuAt.lon, name });
     toast("Waypoint saved"); loadWaypoints();
   } else if (act === "go") {
-    setTarget({ name: "Map point", lat: menuAt.lat, lon: menuAt.lon }); show("go");
+    setTarget({ name: menuAt.name || "Map point", lat: menuAt.lat, lon: menuAt.lon }); show("go");
   } else if (act === "near") {
     S.nearAt = menuAt; show("find");
   } else if (act === "here") {
@@ -345,16 +349,20 @@ $("#cal-start").onclick = async () => {
 const CATS = [["water", "Water"], ["shelter", "Shelter"], ["hospital", "Hospital"], ["doctor", "Doctor"],
   ["pharmacy", "Pharmacy"], ["aed", "AED"], ["police", "Police"], ["fire", "Fire stn"], ["food", "Food shop"],
   ["fuel", "Fuel"], ["hardware", "Hardware"], ["camp", "Camp"], ["toilet", "Toilet"], ["phone", "Phone"],
-  ["peak", "Peak"], ["cave", "Cave"]];
+  ["peak", "Peak"], ["cave", "Cave"], ["airport", "Airport"]];
 const CAT_LABEL = { water: "Drinking water / spring", shelter: "Shelter", hospital: "Hospital", doctor: "Doctor / clinic",
   pharmacy: "Pharmacy", aed: "AED defibrillator", police: "Police", fire: "Fire station", food: "Food shop", fuel: "Fuel station",
-  hardware: "Hardware shop", camp: "Campsite", toilet: "Toilet", phone: "Phone", peak: "Summit", cave: "Cave" };
+  hardware: "Hardware shop", camp: "Campsite", toilet: "Toilet", phone: "Phone", peak: "Summit", cave: "Cave",
+  airport: "Airport", country: "Country", sea: "Sea", ocean: "Ocean", lake: "Lake" };
 $("#cats").innerHTML = CATS.map(c => `<button data-c="${c[0]}">${c[1]}</button>`).join("");
 $("#cats").onclick = (e) => { if (e.target.dataset.c) { S.cat = e.target.dataset.c; loadNearest(); } };
 
+// how far to zoom in when showing a search result on the map
+const KIND_ZOOM = { country: 5, ocean: 3, sea: 5, lake: 8, airport: 13 };
+function zoomFor(kind) { return KIND_ZOOM[kind] || 16; }
 function resultRow(r, i) {
-  const sub = [r.kind || r.cat, r.dist_m != null ? fmtDist(r.dist_m) + " " + cardinal(r.bearing) : "",
-    r.tags && r.tags.opening_hours ? r.tags.opening_hours : ""].filter(Boolean).join(" · ");
+  const sub = [CAT_LABEL[r.kind] || r.kind || CAT_LABEL[r.cat] || r.cat, r.dist_m != null ? fmtDist(r.dist_m) + " " + cardinal(r.bearing) : "",
+    r.tags && r.tags.opening_hours ? r.tags.opening_hours : "", r.info || ""].filter(Boolean).join(" · ");
   return `<div class="item" data-i="${i}">${r.bearing != null ? arrowFor(r.bearing) : ""}
     <div class="grow"><div class="name">${esc(r.name || CAT_LABEL[r.cat] || r.kind)}</div><div class="small">${esc(sub)}</div></div>
     <button data-a="go">Go</button><button data-a="map">Map</button></div>`;
@@ -385,7 +393,7 @@ $("#find-list").onclick = (e) => {
   if (!a || !it) return;
   const r = S.results[it.dataset.i];
   if (a === "go") { setTarget({ name: r.name || r.cat, lat: r.lat, lon: r.lon }); show("go"); }
-  if (a === "map") { S.follow = false; $("#follow").classList.remove("on"); show("map"); map.setView(r.lat, r.lon, 16); }
+  if (a === "map") { S.follow = false; $("#follow").classList.remove("on"); show("map"); map.setView(r.lat, r.lon, zoomFor(r.kind)); }
 };
 
 // ---------------------------------------------------------------- RADIO page
@@ -783,6 +791,7 @@ $("#lib-index").onclick = (e) => {
 };
 $("#lib-body").onclick = (e) => { const id = e.target.dataset.page; if (id) { e.preventDefault(); openPage(id); } };
 let libIndexScroll = 0;
+$("#p-info").addEventListener("scroll", () => $("#lib-page").classList.toggle("scrolled", $("#p-info").scrollTop > 30));
 $("#lib-back").onclick = () => {
   $("#lib-page").classList.add("hidden"); $("#lib-index").classList.remove("hidden");
   $("#p-info").scrollTop = libIndexScroll;  // back to where you were in the list
@@ -863,7 +872,7 @@ async function findAll() {
     findRow(`data-guide="${esc(g.id)}"`, g.title, "", g.snippet)).join("")}</div>`;
   if (r.places.length) html += `<div class="s-sec list"><h3>On the map</h3>${r.places.map((p, i) =>
     findRow(`data-place="${i}"`, p.name || CAT_LABEL[p.cat] || p.kind,
-      [CAT_LABEL[p.kind] || p.kind, p.dist_m != null ? fmtDist(p.dist_m) + " " + cardinal(p.bearing) : ""].filter(Boolean).join(" · "),
+      [CAT_LABEL[p.kind] || p.kind, p.dist_m != null ? fmtDist(p.dist_m) + " " + cardinal(p.bearing) : "", p.info || ""].filter(Boolean).join(" · "),
       "", p.bearing != null ? arrowFor(p.bearing) : "")).join("")}</div>`;
   if (r.videos.length) html += `<div class="s-sec list"><h3>Videos</h3>${r.videos.map(v =>
     findRow(`data-video="${esc(v.url)}" data-title="${esc(v.title)}"`, "▶ " + v.title, v.subject, v.snippet)).join("")}</div>`;
@@ -912,7 +921,9 @@ $("#s-results").onclick = (e) => {
   if (d.guide) { show("info"); openPage(d.guide); }
   else if (d.place != null) {
     const p = S.find.places[d.place];
-    setTarget({ name: p.name || CAT_LABEL[p.cat] || p.kind, lat: p.lat, lon: p.lon }); show("go");
+    if (["country", "sea", "ocean", "lake"].includes(p.kind)) {  // a whole area: show it, a compass arrow means little
+      S.follow = false; $("#follow").classList.remove("on"); show("map"); map.setView(p.lat, p.lon, zoomFor(p.kind));
+    } else { setTarget({ name: p.name || CAT_LABEL[p.cat] || p.kind, lat: p.lat, lon: p.lon }); show("go"); }
   } else if (d.url) {
     $("#s-video").classList.add("hidden"); $("#s-frame").classList.remove("hidden");
     $("#s-frame").src = d.url; findOpen(d.title);

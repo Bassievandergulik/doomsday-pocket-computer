@@ -58,6 +58,7 @@ h3 { margin: 10px 0 4px; font-size: 14px; color: var(--mut); text-transform: upp
   border: 1px solid var(--line); border-radius: 12px; padding: 8px; display: grid;
   grid-template-columns: 1fr 1fr; gap: 6px; }
 #mm-title { grid-column: 1 / -1; font-size: 13px; color: var(--mut); }
+#mm-info { grid-column: 1 / -1; line-height: 1.35; }
 
 .go-wrap { display: flex; gap: 10px; align-items: center; }
 #compass { width: 200px; height: 200px; flex: 0 0 auto; }
@@ -185,3 +186,8 @@ body.osk-open #scroll-arrows { display: none; }
 #lib-body img.photo { display: block; width: 100%; max-width: 420px; border-radius: 6px; margin: 4px 0 8px; }
 /* the guide's Back / A- / A+ bar stays at the top while you scroll a page */
 #lib-page > .row { position: sticky; top: -8px; z-index: 3; background: var(--bg); margin: -8px 0 6px; padding: 8px 0 4px; }
+/* scrolled down: only a small Back button stays (A-/A+ only at the top of the page) */
+#lib-page.scrolled > .row { padding: 6px 0 2px; margin-bottom: 4px; background: transparent; pointer-events: none; }
+#lib-page.scrolled > .row button { display: none; }
+#lib-page.scrolled > .row #lib-back { display: inline-block; flex: 0 0 auto; min-height: 30px; padding: 3px 10px; font-size: 13px;
+  pointer-events: auto; box-shadow: 0 1px 4px rgba(0,0,0,.5); }

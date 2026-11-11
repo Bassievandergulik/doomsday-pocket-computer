@@ -93,6 +93,7 @@ class App:
 
         self.nav_path = self._find_data_file("nav.db")
         self.mbtiles_path = self._find_data_file("map.mbtiles")
+        self.world_path = self._find_data_file("world.db")
         self.user_path = os.path.join(data_dir, "user.db")
         self._local = threading.local()
         self._init_user_db()
@@ -237,6 +238,16 @@ class App:
             self._local.nav = db
         return db
 
+    def world(self):
+        """Rough world map (tools/build_world.py): country outlines, lakes, sea names, airports."""
+        if not os.path.exists(self.world_path):
+            return None
+        db = getattr(self._local, "world", None)
+        if db is None:
+            db = sqlite3.connect("file:%s?mode=ro" % self.world_path, uri=True, check_same_thread=False)
+            self._local.world = db
+        return db
+
     def _has_lo_index(self, db):
         """nav.db built by tools/build_navdb.py since 2026-11 has small R-trees for zoom <= LO_IDX_ZOOM."""
         has = getattr(self._local, "lo_idx", None)
@@ -285,6 +296,46 @@ class App:
 
     # --- map data --------------------------------------------------------
     def vector_tile(self, z, x, y):
+        out = self._nav_tile(z, x, y)
+        wdb = self.world()
+        if wdb is not None:
+            w, s, e, n = geo.tile_bbox(z, x, y)
+            # the world layer goes under the detailed map when zoomed out, and fills the
+            # places the detailed map does not cover (sea, other countries)
+            if z <= 7 or not (out["areas"] or out["lines"]):
+                out["world"] = self._world_base(wdb, z, w, s, e, n)
+            out["airports"] = self._world_airports(wdb, z, w, s, e, n)
+        return out
+
+    def _world_base(self, db, z, w, s, e, n):
+        col = "geom_lo" if z <= 2 else "geom_mid" if z <= 5 else "geom"
+        res = {"land": [], "lakes": [], "labels": []}
+        box = (w, e, s, n)
+        for table in ("land", "lakes"):
+            for (g,) in db.execute(
+                    "SELECT t.%s FROM %s t JOIN %s_idx i ON t.id=i.id "
+                    "WHERE i.maxx>=? AND i.minx<=? AND i.maxy>=? AND i.miny<=? AND t.%s IS NOT NULL"
+                    % (col, table, table, col), box):
+                res[table].append(geo.decode(g))
+        for kind, name, lon, lat in db.execute(
+                "SELECT t.kind, t.name, t.lon, t.lat FROM labels t JOIN labels_idx i ON t.id=i.id "
+                "WHERE i.maxx>=? AND i.minx<=? AND i.maxy>=? AND i.miny<=? AND t.minz<=? "
+                "ORDER BY t.minz LIMIT 40", box + (z + 0.5,)):
+            if kind == "country" and z > 8:
+                continue
+            res["labels"].append([kind, name, lon, lat])
+        return res
+
+    def _world_airports(self, db, z, w, s, e, n):
+        if z < 4:
+            return []
+        sizes = ("large",) if z < 6 else ("large", "medium")
+        return [list(r) for r in db.execute(
+            "SELECT t.icao, t.name, t.size, t.lon, t.lat, t.info FROM airports t JOIN airports_idx i ON t.id=i.id "
+            "WHERE i.maxx>=? AND i.minx<=? AND i.maxy>=? AND i.miny<=? AND t.size IN (%s) LIMIT 200"
+            % ",".join("?" * len(sizes)), (w, e, s, n) + sizes)]
+
+    def _nav_tile(self, z, x, y):
         db = self.nav()
         if db is None:
             return {"lines": [], "areas": [], "places": [], "pois": []}
@@ -321,7 +372,28 @@ class App:
                 out["pois"].append([pid, cat, name, lon, lat])
         return out
 
+    def nearest_airports(self, lat, lon, limit=10, max_km=1500):
+        db = self.world()
+        if db is None:
+            return []
+        dlat = max_km / 111.0
+        dlon = max_km / (111.0 * max(0.05, math.cos(math.radians(lat))))
+        res = []
+        for icao, name, size, plon, plat, info in db.execute(
+                "SELECT t.icao, t.name, t.size, t.lon, t.lat, t.info FROM airports t JOIN airports_idx i ON t.id=i.id "
+                "WHERE i.maxx>=? AND i.minx<=? AND i.maxy>=? AND i.miny<=?",
+                (lon - dlon, lon + dlon, lat - dlat, lat + dlat)):
+            d = geo.haversine(lat, lon, plat, plon)
+            if d <= max_km * 1000:
+                res.append({"cat": "airport", "kind": "airport", "name": name, "lat": plat, "lon": plon,
+                            "info": info, "tags": {}, "dist_m": round(d),
+                            "bearing": round(geo.bearing(lat, lon, plat, plon))})
+        res.sort(key=lambda r: r["dist_m"])
+        return res[:limit]
+
     def nearest(self, lat, lon, cat=None, limit=10, max_km=50):
+        if cat == "airport":
+            return self.nearest_airports(lat, lon, limit)
         db = self.nav()
         if db is None:
             return []
@@ -362,6 +434,24 @@ class App:
                 rows = []
             for name, kind, ref, plon, plat in rows:
                 item = {"name": name, "kind": kind, "ref": ref, "lat": plat, "lon": plon}
+                if lat is not None:
+                    item["dist_m"] = round(geo.haversine(lat, lon, plat, plon))
+                    item["bearing"] = round(geo.bearing(lat, lon, plat, plon))
+                out.append(item)
+        wdb = self.world()
+        if wdb is not None and q.strip():
+            terms = " ".join('"%s"*' % t.replace('"', "") for t in q.split())
+            try:
+                rows = wdb.execute("SELECT name, kind, ref, lon, lat FROM search WHERE search MATCH ? "
+                                   "ORDER BY rank LIMIT 20", (terms,)).fetchall()
+            except sqlite3.OperationalError:
+                rows = []
+            for name, kind, ref, plon, plat in rows:
+                item = {"name": name, "kind": kind, "ref": ref, "lat": plat, "lon": plon}
+                if kind == "airport":
+                    a = wdb.execute("SELECT name, info FROM airports WHERE id=?", (int(ref[3:]),)).fetchone()
+                    if a:
+                        item["name"], item["info"] = a
                 if lat is not None:
                     item["dist_m"] = round(geo.haversine(lat, lon, plat, plon))
                     item["bearing"] = round(geo.bearing(lat, lon, plat, plon))
@@ -601,7 +691,7 @@ class Handler(BaseHTTPRequestHandler):
                 data = app.vector_tile(z, x, y)
                 # revalidate every time (cheap on the device), and never keep an empty tile:
                 # a tile fetched before nav.db existed would otherwise stay blank in the browser
-                empty = not any(data.get(k) for k in ("lines", "areas", "places", "pois"))
+                empty = not any(data.get(k) for k in ("lines", "areas", "places", "pois", "world", "airports"))
                 return self._send(200, data, cache="no-store" if empty else "no-cache")
             if p.startswith("/tiles/"):
                 return self._raster(p)

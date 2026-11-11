@@ -67,6 +67,12 @@ python3 tools/build_navdb.py utrecht-latest.osm.pbf data/nav.db
 Several regions go into one map: list them all, e.g. `python3 tools/build_navdb.py netherlands-latest.osm.pbf curacao.osm data/nav.db`. For a small island without its own Geofabrik file, download it from Overpass by bounding box (Curaçao: `curl -o curacao.osm 'https://overpass-api.de/api/interpreter?data=[out:xml][timeout:300];(nwr(11.97,-69.20,12.40,-68.70););(._;>;);out;'`).
 Rough sizes: a Dutch province gives a 30–150 MB database in 5–20 minutes; all of the Netherlands (≈1.3 GB pbf) needs 8+ GB RAM, about an hour, and gives roughly 1–1.5 GB. Add `--buildings` for house outlines (much larger). Map data © OpenStreetMap contributors, ODbL.
 
+## 1a. Rough world map and airports (on your PC, with internet)
+```bash
+python3 tools/build_world.py data/world.db     # ~4 MB, a few seconds, no extra packages
+```
+Country outlines, lakes, sea and ocean names, and about 5,300 large and medium airports with runways (length, surface) and VHF airband frequencies. It is drawn under the detailed map when zoomed out and wherever nav.db has no data (the sea, other countries). Airports show as purple ✈ dots; long-press one for its runways and frequencies, search by name, ICAO or IATA code, or use the Airport button under Find for the nearest ones. Sources: Natural Earth 1:50m and OurAirports, both public domain. Not for real navigation: frequencies and runways change.
+
 ## 1b. Satellite imagery (optional, on your PC)
 `tools/build_imagery.py` downloads imagery into `data/map.mbtiles`; the ▦ button on the map switches to it, with roads drawn on top. Run it several times to layer sources: where sharp tiles are missing the map shows the low-detail world imagery instead. Interrupted downloads continue where they stopped.
 ```bash
