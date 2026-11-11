@@ -58,10 +58,28 @@ const OSK = (() => {
     target = resolver = null;
   }
 
+  // Press highlights the key, release types it. A resistive screen's first reading of a touch is
+  // the least accurate one, so typing on release (where the finger settled) hits the right key
+  // more often; sliding off a key before lifting cancels it.
+  let pressed = null;
   el.addEventListener("pointerdown", (e) => {
-    const b = e.target.closest("button");
-    if (!b) return;
     e.preventDefault();  // keep focus, no ghost clicks
+    const b = e.target.closest("button");
+    if (pressed) pressed.classList.remove("down");
+    pressed = b; if (b) b.classList.add("down");
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (!pressed) return;
+    const b = document.elementFromPoint(e.clientX, e.clientY);
+    const k = b && b.closest && b.closest("#osk button");
+    if (k !== pressed) { pressed.classList.remove("down"); pressed = k || null; if (k) k.classList.add("down"); }
+  });
+  el.addEventListener("pointercancel", () => { if (pressed) pressed.classList.remove("down"); pressed = null; });
+  el.addEventListener("pointerup", (e) => {
+    const b = pressed; pressed = null;
+    if (!b) return;
+    b.classList.remove("down");
+    e.preventDefault();
     const k = b.dataset.k;
     if (k === "cancel") return close(false);
     if (k === "↵") return close(true);

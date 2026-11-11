@@ -875,6 +875,9 @@ async function findAll() {
     let w;
     try { w = await api(`/api/find/wiki?book=${encodeURIComponent(b.name)}&q=${encodeURIComponent(b.query)}`); }
     catch (e) { w = { results: [], error: "not reachable" }; }
+    if (!w.results.length && b.alt && run === findRun) {  // what you typed found nothing: try the spelling fix
+      try { w = await api(`/api/find/wiki?book=${encodeURIComponent(b.name)}&q=${encodeURIComponent(b.alt)}`); } catch (e) { /* keep first */ }
+    }
     if (run !== findRun) return;
     const el = $("#s-book-" + i);
     if (!el) continue;
@@ -958,7 +961,7 @@ function scrollArrowsUpdate() {
 }
 function pageScroll(dir) {
   const [el] = scrollTarget(); if (!el) return;
-  el.scrollTop += dir * Math.max(40, Math.round(el.clientHeight * 0.8));
+  el.scrollTop += dir * Math.max(40, Math.round(el.clientHeight * 0.75));
   scrollArrowsUpdate();
 }
 $("#sa-up").onclick = () => pageScroll(-1);

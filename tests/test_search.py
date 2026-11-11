@@ -60,6 +60,14 @@ class LexiconTest(unittest.TestCase):
         # Spanish article "las" must not turn into the Polish word for forest
         self.assertEqual([p["text"] for p in self.lex.analyze("las setas")], ["setas"])
 
+    def test_place_names_are_not_corrected_into_concepts(self):
+        for q in ("curacao", "china", "chile"):
+            self.assertIsNone(self.lex.analyze(q)[0]["concept"], q)
+        # a real typo is still fixed for the guide, but Wikipedia gets what was typed
+        parts = self.lex.analyze("spain")
+        self.assertEqual(parts[0]["concept"], "sprain")
+        self.assertEqual(self.lex.translate(parts, "en", keep_guesses=True), "spain")
+
     def test_poi(self):
         self.assertEqual(self.lex.poi_categories(self.lex.analyze("ziekenhuis")), ["hospital"])
         self.assertEqual(self.lex.poi_categories(self.lex.analyze("agua potable")), ["water"])

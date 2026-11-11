@@ -128,7 +128,9 @@ class Lexicon:
                     w = max(stems, key=len)
                     hit = (1, self.phrases[(w,)], None)
                 elif len(t) >= 4 and not t.isdigit() and t not in known:
-                    close = difflib.get_close_matches(t, self.single, n=1, cutoff=0.8)
+                    # same first letter: typos rarely hit it, and without this place names
+                    # became concepts (curacao -> furacao "storm", china -> cheia "flood")
+                    close = difflib.get_close_matches(t, [w for w in self.single if w[0] == t[0]], n=1, cutoff=0.8)
                     if close:
                         hit = (1, self.phrases[(close[0],)], close[0])
             if hit:
@@ -150,12 +152,14 @@ class Lexicon:
                 votes[l] = votes.get(l, 0) + 1.0 / len(p["langs"])
         return max(votes, key=votes.get) if votes else None
 
-    def translate(self, parts, lang):
+    def translate(self, parts, lang, keep_guesses=False):
         """The query in another language: concepts become that language's main word, other words stay.
-        With several words the shortest form is used, so "water zuiveren" becomes "water purify"."""
+        With several words the shortest form is used, so "water zuiveren" becomes "water purify".
+        keep_guesses: words that were only typo-corrected stay as typed (Wikipedia has its own
+        spelling help and knows names the lexicon doesn't: Spain is not "sprain")."""
         out = []
         for p in parts:
-            if p["concept"]:
+            if p["concept"] and not (keep_guesses and p["corrected"]):
                 w = self.concepts[p["concept"]]["words"]
                 ws = w.get(lang) or w["en"]
                 out.append(ws[0] if len(parts) == 1 else min(ws, key=lambda x: len(tokens(x))))
@@ -168,7 +172,7 @@ class Lexicon:
         out = []
         for p in parts:
             if p["concept"]:
-                alts = set()
+                alts = {(p["text"],)} if p["corrected"] else set()  # also what was typed
                 for ws in self.concepts[p["concept"]]["words"].values():
                     for w in ws:
                         tk = tuple(tokens(w))
@@ -341,7 +345,8 @@ class Finder:
         out = []
         for b in sorted(books, key=rank):
             ql = b["lang"] if b["lang"] in LANGS else (lang or "en")
-            out.append(dict(b, query=self.lex.translate(parts, ql)))
+            q, alt = self.lex.translate(parts, ql, keep_guesses=True), self.lex.translate(parts, ql)
+            out.append(dict(b, query=q, alt=alt if alt != q else None))  # alt: the spelling fix, if nothing is found
         return out
 
     def find(self, q, lat=None, lon=None):

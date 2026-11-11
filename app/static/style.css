@@ -117,14 +117,16 @@ article code { background: var(--card); padding: 0 3px; }
 .fc-table td, .fc-table th { padding: 2px 3px; border-bottom: 1px solid var(--line); text-align: right; }
 .fc-table td:first-child, .fc-table th:first-child { text-align: left; }
 
-#osk { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--card);
+#osk { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; touch-action: none; background: var(--card);
   border-top: 2px solid var(--acc); padding: 4px; display: flex; flex-direction: column; gap: 3px; }
 #osk-top { display: flex; gap: 4px; align-items: center; }
 #osk-title { font-size: 11px; color: var(--mut); max-width: 30%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 #osk-field { flex: 1; min-height: 34px; font-size: 16px; }
 .osk-x { min-height: 34px; width: 44px; padding: 0; }
+#osk-keys { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
 .osk-row { display: flex; gap: 3px; }
-.osk-row button { flex: 1; min-height: 40px; padding: 0; font-size: 17px; border-radius: 6px; min-width: 0; }
+.osk-row button.down { background: var(--acc); color: #000; transform: scale(1.08); }
+.osk-row button { flex: 1; min-height: 52px; padding: 0; font-size: 17px; border-radius: 6px; min-width: 0; }
 .osk-row button.fn { flex: 1.4; font-size: 14px; background: var(--line); }
 .osk-row button.space { flex: 4; }
 body.osk-open main { padding-bottom: 0; }
