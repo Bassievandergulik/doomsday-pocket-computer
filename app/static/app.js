@@ -252,7 +252,7 @@ function updateGo() {
   }
   const g = S.gpsRaw || {};
   $("#go-head").textContent = S.heading != null
-    ? `Facing ${Math.round(S.heading)}° ${cardinal(S.heading)} (${g.source === "gps-course" ? "GPS course" : g.compass ? "compass" : "GPS course"})`
+    ? `Facing ${Math.round(S.heading)}° ${cardinal(S.heading)} (${g.heading_source === "gps-course" ? "GPS course" : g.compass ? "compass" : "GPS course"})`
     : (g.compass ? "Compass: hold flat" : "No compass: the arrow is relative to north, walk to get a GPS course");
   drawCompass(brg);
   const st = S.status;

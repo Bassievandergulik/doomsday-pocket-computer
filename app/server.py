@@ -506,7 +506,7 @@ class App:
             f = self.gps.get()
             if f.get("track") is not None and (f.get("speed") or 0) > 0.8:
                 h, src = f["track"], "gps-course"
-        return {"heading": h, "source": src, "compass": self.compass.available}
+        return {"heading": h, "heading_source": src, "compass": self.compass.available}
 
     def status(self):
         f = self.gps.get()
