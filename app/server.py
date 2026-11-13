@@ -46,7 +46,7 @@ LO_IDX_ZOOM = 9     # up to this zoom, tiles use lines_lo_idx/areas_lo_idx (feat
 
 DEFAULT_CONFIG = {
     "port": 8080,
-    "gps_serial": "/dev/serial0",       # GPS module on the UART (gpsd is tried first)
+    "gps_serial": None,                 # e.g. "/dev/serial0" to read the GPS without gpsd; never both (they fight over the port)
     "gps_baud": 9600,
     "simulate_position": None,          # e.g. [52.09, 5.12] when testing without GPS
     "home_altitude_m": 0,               # used by the barometer when there is no GPS fix
@@ -506,7 +506,7 @@ class App:
             f = self.gps.get()
             if f.get("track") is not None and (f.get("speed") or 0) > 0.8:
                 h, src = f["track"], "gps-course"
-        return {"heading": h, "source": src, "compass": self.compass.available}
+        return {"heading": h, "heading_source": src, "compass": self.compass.available}
 
     def status(self):
         f = self.gps.get()

@@ -106,8 +106,16 @@ class GPS:
                                  alt=msg.get("altMSL", msg.get("alt")), speed=msg.get("speed"),
                                  track=msg.get("track"), utc=msg.get("time"), source="gpsd")
                 elif msg.get("class") == "SKY":
-                    sats = [x for x in msg.get("satellites", []) if x.get("used")]
-                    self._update(sats=len(sats), hdop=msg.get("hdop"))
+                    # gpsd 3.2x sends uSat (satellites used); older versions only the satellite list,
+                    # and some SKY messages carry neither: then keep the last count
+                    used = msg.get("uSat")
+                    if used is None and "satellites" in msg:
+                        used = len([x for x in msg["satellites"] if x.get("used")])
+                    upd = {"hdop": msg["hdop"]} if msg.get("hdop") is not None else {}
+                    if used is not None:
+                        upd["sats"] = used
+                    if upd:
+                        self._update(**upd)
 
     def _serial(self):
         try:

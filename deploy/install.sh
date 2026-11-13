@@ -26,7 +26,7 @@ sudo tee /etc/default/gpsd >/dev/null <<CFG
 START_DAEMON="true"
 USBAUTO="true"
 DEVICES="/dev/serial0"
-GPSD_OPTIONS="-n"
+GPSD_OPTIONS="-n -b"  # -b: read-only, keep the module in NMEA (binary mode hides the satellite counts)
 CFG
 sudo systemctl enable gpsd
 
@@ -152,6 +152,9 @@ echo "== DS3231 clock chip: keeps the time while switched off (no internet or GP
 CFG=/boot/firmware/config.txt; [ -f "$CFG" ] || CFG=/boot/config.txt
 grep -q '^dtoverlay=i2c-rtc' "$CFG" || echo 'dtoverlay=i2c-rtc,ds3231' | sudo tee -a "$CFG" >/dev/null
 # After the first boot with internet or GPS time:  sudo hwclock -w   (the app also does this when you set the clock)
+
+echo "== Compass (BMM150): GPIO5 and GPIO6 held high for its CS and PS pins (I2C mode, address 0x13)"
+grep -q '^gpio=5,6=op,dh' "$CFG" || echo 'gpio=5,6=op,dh' | sudo tee -a "$CFG" >/dev/null
 
 if [ "${NO_WIFI:-0}" = "1" ]; then
   echo "== NO_WIFI=1: switch WiFi and Bluetooth off at the next boot"
