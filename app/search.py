@@ -306,9 +306,13 @@ def scan_videos(roots):
 class Finder:
     """Ties the sources together; server.py exposes it as /api/find."""
 
-    def __init__(self, app, lexicon_path, kiwix=None, video_roots=()):
+    def __init__(self, app, lexicon_path, kiwix=None, video_roots=(), symptoms_path=None):
         self.app = app
         self.lex = Lexicon(lexicon_path)
+        self.symptoms = None
+        if symptoms_path and os.path.exists(symptoms_path):
+            from symptoms import SymptomChecker
+            self.symptoms = SymptomChecker(symptoms_path)
         self.kiwix = kiwix
         self.video_roots = list(video_roots)
         self.guide = TextIndex()
@@ -365,7 +369,18 @@ class Finder:
             "videos": self.videos.search(groups, 8),
             "places": [],
             "books": self.books_for(parts, lang),
+            # "fever headache stiff neck": which common conditions fit (not a diagnosis)
+            "health": self.symptoms.check(q) if self.symptoms else None,
         }
+        h = res["health"]
+        if h and h["conditions"] and (len(h["symptoms"]) >= 2 or h["danger"]):
+            # a description of symptoms: look up the best match in Wikipedia/WikiMed instead of the loose words
+            c = self.symptoms.by_id[h["conditions"][0]["id"]]
+            for b in res["books"]:
+                local = c["names"].get(b["lang"])
+                b["query"] = local if local and b["lang"] != "en" and len(local.split()) == 1 else c["wiki"]
+                b["alt"] = None
+            res["translations"] = {}
         # map: names that match, plus the nearest useful places for words like "water" or "hospital"
         try:
             res["places"] = self.app.search(q, lat, lon)[:8]

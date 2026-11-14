@@ -191,3 +191,12 @@ body.osk-open #scroll-arrows { display: none; }
 #lib-page.scrolled > .row button { display: none; }
 #lib-page.scrolled > .row #lib-back { display: inline-block; flex: 0 0 auto; min-height: 30px; padding: 3px 10px; font-size: 13px;
   pointer-events: auto; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+
+/* symptom checker in search */
+.hc .lvl { font-size: 10px; font-weight: 700; padding: 3px 4px; border-radius: 4px; min-width: 66px; text-align: center; }
+.lvl-now { background: var(--bad); color: #fff; } .lvl-soon { background: var(--acc); color: #000; } .lvl-self { background: var(--ok); color: #000; }
+.hc .name { white-space: normal; }
+.hc.open .arrow { transform: rotate(90deg); }
+.hc-more { padding: 6px 8px 8px; font-size: 13px; line-height: 1.35; border-bottom: 1px solid var(--line); background: var(--card); }
+.hc-more > div { margin: 3px 0; }
+.hc-more .row { gap: 6px; margin-top: 6px; }

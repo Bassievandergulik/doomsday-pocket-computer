@@ -95,7 +95,8 @@ class FakeApp:
     def __init__(self, kiwix_url, video_dir):
         self.library = Library(os.path.join(ROOT, "library"))
         self.kiwix = Kiwix(kiwix_url)
-        self.finder = search.Finder(self, LEX, self.kiwix, [video_dir])
+        self.finder = search.Finder(self, LEX, self.kiwix, [video_dir],
+                                    symptoms_path=os.path.join(ROOT, "app", "symptoms.txt"))
 
         class HS:
             started = None
@@ -168,6 +169,12 @@ class EndToEndTest(unittest.TestCase):
         self.assertEqual(w["results"][0]["title"], "Curaçao")
         self.assertTrue(w["results"][0]["title_match"])
         self.assertEqual(self.get(w["results"][0]["url"])[0].status, 200)
+
+    def test_symptoms_in_search(self):
+        d = json.loads(self.get("/api/find?q=" + quote("koorts hoofdpijn stijve nek"))[1])
+        self.assertEqual(d["health"]["conditions"][0]["id"], "meningitis")
+        self.assertTrue(d["health"]["danger"])
+        self.assertIsNone(json.loads(self.get("/api/find?q=water")[1])["health"])
 
     def test_map_concepts(self):
         d = json.loads(self.get("/api/find?q=" + quote("hospital"))[1])
