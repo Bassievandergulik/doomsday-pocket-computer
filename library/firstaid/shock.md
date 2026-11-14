@@ -11,6 +11,9 @@ Shock means not enough blood reaches the organs, after blood loss, burns, severe
 1. Treat the cause: stop bleeding, cool burns.
 2. **Lay them down.** Raise the legs about 30 cm if no leg/hip/spine injury.
 3. Loosen tight clothing. Keep them **warm**: blanket under and over them.
+
+![Shock: lie flat, legs up](fig:shock-legs-up.svg)
+
 4. Reassure them. Don't leave them alone.
 5. **Nothing to eat or drink** if medical help is coming soon (small sips of water only if help is many hours away and they are alert).
 6. Check breathing and pulse every few minutes. Unconscious and breathing: [recovery position](page:firstaid/cpr).

@@ -11,8 +11,14 @@ Use **Find → Water** first: it lists mapped drinking taps, wells and springs w
 
 ## Collecting
 - **Rain**: tarp or poncho tied with a low centre over a container. Roof runoff: let the first few minutes wash the roof, then collect. Treat before drinking.
+
+![Rain catcher](fig:rain-catch.svg)
+
 - **Dew**: tie cloth around your ankles and walk through wet grass at dawn, wring it out. Can give 0.5–1 L in an hour in the right conditions.
 - **Transpiration bag**: clear plastic bag tied over a leafy (non-poisonous) branch in sun, small stone in the low corner. A few hundred ml per day.
+
+![Transpiration bag](fig:transpiration-bag.svg)
+
 - **Solar still**: works poorly, uses more sweat to dig than it makes. Last resort.
 
 ## Rationing

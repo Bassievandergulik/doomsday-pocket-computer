@@ -15,6 +15,8 @@ def _inline(text):
     t = re.sub(r"`(.+?)`", r"<code>\1</code>", t)
     # pictures drawn by tools/make_signs.py:  ![Flag A](sign:flag-A.svg)
     t = re.sub(r"!\[([^\]]*)\]\(sign:([\w\-]+\.svg)\)", r'<img class="sign" src="/static/signs/\2" alt="\1">', t)
+    # step pictures drawn by tools/make_figures.py, inside a list item or sentence
+    t = re.sub(r"!\[([^\]]*)\]\(fig:([\w\-]+\.svg)\)", r'<img class="fig" src="/static/figs/\2" alt="\1">', t)
     # photos downloaded by tools/get_plant_photos.py: ![Nettle](photo:stinging-nettle.jpg); hidden if missing
     t = re.sub(r"!\[([^\]]*)\]\(photo:([\w\-]+\.jpg)\)",
                r'<img class="photo" src="/static/photos/\2" alt="\1" onerror="this.remove()">', t)
@@ -38,6 +40,15 @@ def md_to_html(md):
         line = lines[i].rstrip()
         if not line.strip():
             close_lists()
+            i += 1
+            continue
+        # a picture on a line of its own: full width with its caption under it (tap to enlarge)
+        m = re.match(r"^\s*!\[([^\]]*)\]\(fig:([\w\-]+\.svg)\)\s*$", line)
+        if m:
+            close_lists()
+            cap = html.escape(m.group(1))
+            out.append('<figure class="fig"><img src="/static/figs/%s" alt="%s"><figcaption>%s</figcaption></figure>'
+                       % (m.group(2), cap, cap))
             i += 1
             continue
         m = re.match(r"^(#{1,4})\s+(.*)", line)
@@ -77,14 +88,16 @@ def md_to_html(md):
                 out.append("</%s>" % list_stack.pop())
             while len(list_stack) < depth:
                 list_stack.append(kind)
-                out.append("<%s>" % kind)
+                # a numbered list that continues after a picture keeps its numbers
+                n = int(m.group(2)[:-1]) if kind == "ol" else 1
+                out.append('<ol start="%d">' % n if kind == "ol" and n > 1 else "<%s>" % kind)
             out.append("<li>%s</li>" % _inline(m.group(3)))
             i += 1
             continue
         close_lists()
         buf = [line.strip()]
         i += 1
-        while i < len(lines) and lines[i].strip() and not re.match(r"^(#|\||>|\s*([-*]|\d+\.)\s)", lines[i]):
+        while i < len(lines) and lines[i].strip() and not re.match(r"^(#|\||>|\s*([-*]|\d+\.)\s|\s*!\[[^\]]*\]\(fig:)", lines[i]):
             buf.append(lines[i].strip())
             i += 1
         out.append("<p>%s</p>" % _inline(" ".join(buf)))

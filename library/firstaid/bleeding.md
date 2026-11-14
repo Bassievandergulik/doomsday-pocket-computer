@@ -17,6 +17,8 @@ Use when pressure fails or you cannot keep pressing (several casualties, need to
 4. Do not loosen it. It can safely stay for about 2 hours; doctors remove it.
 5. Bleeding continues? Add a second tourniquet just above the first.
 
+![Tourniquet: 3 steps](fig:tourniquet.svg)
+
 ## Nosebleed
 Sit leaning **forward**, pinch the soft part of the nose for 10–15 minutes, breathe through the mouth. Don't tip the head back.
 

@@ -754,6 +754,22 @@ class LibraryTest(unittest.TestCase):
         self.assertEqual(lib.search("tourniquet")[0]["id"], "firstaid/bleeding")
         self.assertIn("<table>", lib.page("water/purifying")["html"])
 
+    def test_step_pictures(self):
+        """Every ![..](fig:x.svg) in the guide has its drawing, and shows as a figure with a caption."""
+        lib = Library(os.path.join(ROOT, "library"))
+        figs = os.path.join(ROOT, "app", "static", "figs")
+        used = set()
+        for p in lib.pages.values():
+            for name in re.findall(r"\(fig:([\w\-]+\.svg)\)", p["text"]):
+                self.assertTrue(os.path.exists(os.path.join(figs, name)), "missing picture %s in %s" % (name, p["id"]))
+                used.add(name)
+        self.assertGreater(len(used), 40)
+        h = lib.page("skills/knots")["html"]
+        self.assertIn('<figure class="fig"><img src="/static/figs/knot-bowline.svg"', h)
+        self.assertIn("<figcaption>Bowline in 3 steps</figcaption>", h)
+        # a numbered list interrupted by a picture keeps counting
+        self.assertIn('<ol start="6">', lib.page("firstaid/cpr")["html"])
+
 
 class BuilderTest(unittest.TestCase):
     def test_build_sample(self):

@@ -16,6 +16,9 @@ Wet + wind + exhaustion can cause hypothermia even at +10 °C. Check the Weather
 4. Warm sweet drinks **only if fully alert** and able to swallow. No alcohol.
 5. Heat packs or warm water bottles (wrapped) on the **chest, armpits, neck and groin**, not hands and feet.
 6. Body-to-body warmth in a sleeping bag works.
+
+![Where to put heat packs](fig:hypothermia-warming.svg)
+
 7. Handle **gently**, keep them lying flat in moderate/severe cases: rough movement can trigger cardiac arrest.
 8. No signs of life: CPR. "Nobody is dead until warm and dead".
 

@@ -183,6 +183,12 @@ body.osk-open #scroll-arrows { display: none; }
 /* guide: flags & signs pictures */
 #lib-body img.sign { height: 44px; vertical-align: middle; }
 #lib-body .flag { font-size: 30px; line-height: 1; font-family: "Noto Color Emoji", sans-serif; }
+/* guide: step pictures (tools/make_figures.py); tap one to see it full screen */
+#lib-body figure.fig { margin: 6px 0 10px; }
+#lib-body figure.fig img, #lib-body img.fig { display: block; width: 100%; max-width: 440px; height: auto; border-radius: 8px; }
+#lib-body figure.fig figcaption { font-size: 12px; color: var(--mut); margin-top: 2px; }
+body.night #lib-body img.fig, body.night #lib-body figure.fig img { filter: invert(1) sepia(1) saturate(6) hue-rotate(-40deg) brightness(.7); }
+#v-body img.figfull { display: block; max-width: 100%; max-height: calc(100vh - 50px); margin: 0 auto; }
 #lib-body img.photo { display: block; width: 100%; max-width: 420px; border-radius: 6px; margin: 4px 0 8px; }
 /* the guide's Back / A- / A+ bar stays at the top while you scroll a page */
 #lib-page > .row { position: sticky; top: -8px; z-index: 3; background: var(--bg); margin: -8px 0 6px; padding: 8px 0 4px; }

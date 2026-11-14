@@ -10,6 +10,8 @@ Hot places kill through **water loss** and **heat stroke** long before hunger. I
 - **Coconuts**: green (young) nuts hold clean water; ripe brown ones have little, and too much of their milk is laxative.
 - A **solar still** (hole, container in the middle, plastic sheet with a stone on top) gives only about 0.5 litre a day: not enough on its own, but useful for purifying urine or seawater.
 
+![Solar still](fig:solar-still.svg)
+
 ## Heat illness
 Headache, dizziness, nausea, cramps, dark urine = **heat exhaustion**: shade, lie down, drink, cool with water. Hot dry or confused person = **heat stroke**, an emergency: cool immediately with water and wind. See [Heat illness](page:firstaid/heat).
 

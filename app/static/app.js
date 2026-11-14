@@ -606,6 +606,7 @@ async function swOpen(r) {
   viewing = r;
   $("#v-title").textContent = r.name + " · " + swTime(r.time_utc) + " UTC";
   $("#v-zoom").classList.toggle("hidden", r.kind !== "fax");
+  $("#v-del").classList.remove("hidden");
   if (r.kind === "fax") {
     $("#v-body").innerHTML = `<img src="/sw/${esc(r.small)}" class="fit">`;
   } else {
@@ -789,7 +790,16 @@ $("#lib-index").onclick = (e) => {
   if (e.target.dataset.retry) return loadLibraryIndex();
   const id = e.target.dataset.page; if (id) openPage(id);
 };
-$("#lib-body").onclick = (e) => { const id = e.target.dataset.page; if (id) { e.preventDefault(); openPage(id); } };
+$("#lib-body").onclick = (e) => {
+  const id = e.target.dataset.page; if (id) { e.preventDefault(); openPage(id); return; }
+  // tap a step picture: show it as big as the screen allows
+  if (e.target.tagName === "IMG" && (e.target.classList.contains("fig") || e.target.closest("figure.fig"))) {
+    $("#v-title").textContent = e.target.alt || "Picture";
+    $("#v-zoom").classList.add("hidden"); $("#v-del").classList.add("hidden");
+    $("#v-body").innerHTML = `<img class="figfull" src="${esc(e.target.getAttribute("src"))}" alt="">`;
+    $("#viewer").classList.remove("hidden");
+  }
+};
 let libIndexScroll = 0;
 $("#p-info").addEventListener("scroll", () => $("#lib-page").classList.toggle("scrolled", $("#p-info").scrollTop > 30));
 $("#lib-back").onclick = () => {
