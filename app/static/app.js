@@ -868,8 +868,13 @@ async function findAll() {
   $("#s-info").innerHTML = info;
 
   let html = "";
+  // symptoms typed ("koorts hoofdpijn stijve nek"): what it could be, on top when it is clearly a description
+  const h = r.health;
+  const hTop = h && h.conditions.length && (h.symptoms.length >= 2 || h.danger.length);
+  if (hTop) html += healthHtml(h);
   if (r.guide.length) html += `<div class="s-sec list"><h3>Survival guide</h3>${r.guide.map(g =>
     findRow(`data-guide="${esc(g.id)}"`, g.title, "", g.snippet)).join("")}</div>`;
+  if (h && h.conditions.length && !hTop) html += healthHtml(h);
   if (r.places.length) html += `<div class="s-sec list"><h3>On the map</h3>${r.places.map((p, i) =>
     findRow(`data-place="${i}"`, p.name || CAT_LABEL[p.cat] || p.kind,
       [CAT_LABEL[p.kind] || p.kind, p.dist_m != null ? fmtDist(p.dist_m) + " " + cardinal(p.bearing) : "", p.info || ""].filter(Boolean).join(" · "),
@@ -900,6 +905,49 @@ async function findAll() {
       : `<div class="small">${esc(w.error ? "Not searchable: " + w.error : "Nothing found.")}</div>`;
   }
 }
+const HLEVEL = { now: ["EMERGENCY", "Get medical help now (112) if you can."],
+  soon: ["DOCTOR", "See a doctor within a day if you can."],
+  self: ["SELF-CARE", "Usually gets better with rest and care."] };
+function healthHtml(h) {
+  let html = `<div class="s-sec list" id="s-health"><h3>What it could be <span class="small">a guess, not a diagnosis</span></h3>`;
+  if (h.danger.length) html += `<div class="warn"><b>Danger sign: ${h.danger.map(esc).join(", ")}.</b> Get medical help now if you can (112). Read the first result.</div>`;
+  else if (h.urgent) html += `<div class="warn">The best match can be an emergency. Check it first.</div>`;
+  h.conditions.forEach((c, i) => {
+    html += `<div class="item hc" data-health="${i}"><span class="lvl lvl-${c.level}">${HLEVEL[c.level][0]}</span>
+      <div class="grow"><div class="name">${esc(c.name)}</div>
+      <div class="small">${c.local && c.local !== c.name ? esc(c.local) + " · " : ""}fits: ${c.matched.map(esc).join(", ")}</div></div>
+      <span class="arrow">›</span></div>
+      <div class="hc-more hidden" id="hc-${i}"><div><b>${esc(HLEVEL[c.level][1])}</b></div>
+      <div>${esc(c.advice)}</div>
+      ${c.also.length ? `<div class="small">Also typical: ${c.also.map(esc).join(", ")}</div>` : ""}
+      <div class="row">${c.guide ? `<button data-hguide="${esc(c.guide)}">Survival guide</button>` : ""}
+      <button data-hwiki="${i}">Read more</button></div><div class="small hc-msg"></div></div>`;
+  });
+  const unk = h.unknown.length ? ` Not understood: ${h.unknown.map(esc).join(", ")}.` : "";
+  html += `<div class="small" style="margin:4px 0">Understood: ${h.symptoms.map(s => esc(s.name)).join(", ")}.${unk}
+    Picked from a list of common problems. If someone is getting worse, treat the most serious match first.</div></div>`;
+  return html;
+}
+async function healthWiki(c, msg) {
+  // the medical article: WikiMed if installed, else Wikipedia in English, else any library
+  const books = (S.find && S.find.books) || [];
+  const order = [b => /wikimed|medicine/i.test(b.name + " " + b.title), b => b.lang === "en", () => true];
+  const tries = [];
+  order.forEach(f => books.filter(f).forEach(b => { if (!tries.includes(b)) tries.push(b); }));
+  if (!tries.length) { msg.textContent = "No WikiMed or Wikipedia installed yet."; return; }
+  msg.textContent = "Looking it up...";
+  for (const b of tries.slice(0, 3)) {
+    let w;
+    try { w = await api(`/api/find/wiki?book=${encodeURIComponent(b.name)}&q=${encodeURIComponent(c.wiki)}`); } catch (e) { continue; }
+    const a = w.results.find(x => x.title_match) || w.results[0];
+    if (a) {
+      msg.textContent = "";
+      $("#s-video").classList.add("hidden"); $("#s-frame").classList.remove("hidden");
+      $("#s-frame").src = a.url; findOpen(a.title); return;
+    }
+  }
+  msg.textContent = "Not found in the offline library.";
+}
 function findOpen(title) {
   $("#s-rtitle").textContent = title || "";
   $("#s-main").classList.add("hidden"); $("#s-reader").classList.remove("hidden");
@@ -915,10 +963,17 @@ $("#s-go").onclick = findAll;
 $("#s-q").onkeydown = (e) => { if (e.key === "Enter") findAll(); };
 $("#s-back").onclick = findClose;
 $("#s-results").onclick = (e) => {
+  const hb = e.target.closest("[data-hguide],[data-hwiki]");
+  if (hb) {
+    if (hb.dataset.hguide) { show("info"); openPage(hb.dataset.hguide); }
+    else healthWiki(S.find.health.conditions[hb.dataset.hwiki], hb.closest(".hc-more").querySelector(".hc-msg"));
+    return;
+  }
   const it = e.target.closest(".item");
   if (!it) return;
   const d = it.dataset;
-  if (d.guide) { show("info"); openPage(d.guide); }
+  if (d.health != null) { $("#hc-" + d.health).classList.toggle("hidden"); it.classList.toggle("open"); }
+  else if (d.guide) { show("info"); openPage(d.guide); }
   else if (d.place != null) {
     const p = S.find.places[d.place];
     if (["country", "sea", "ocean", "lake"].includes(p.kind)) {  // a whole area: show it, a compass arrow means little

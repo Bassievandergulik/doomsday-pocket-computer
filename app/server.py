@@ -101,7 +101,8 @@ class App:
         self.library = Library(os.path.join(HERE, "..", "library"))
         self.kiwix = Kiwix(self.config["kiwix_url"])
         self.finder = Finder(self, os.path.join(HERE, "lexicon.txt"), self.kiwix,
-                             [os.path.join(d, "videos") for d in [data_dir] + list(self.config["extra_data_dirs"])])
+                             [os.path.join(d, "videos") for d in [data_dir] + list(self.config["extra_data_dirs"])],
+                             symptoms_path=os.path.join(HERE, "symptoms.txt"))
         self.hotspot = hotspot_mod.Hotspot(self.get_setting, self.set_setting, self.config["hotspot_auto_off_min"])
 
         self.gps = GPS(serial_port=self.config["gps_serial"], baud=self.config["gps_baud"],

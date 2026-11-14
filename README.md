@@ -48,6 +48,7 @@ app/static/files.html  the computer's upload/download page
 app/library.py       Markdown library
 app/search.py        multilingual search over everything (no AI, no internet)
 app/lexicon.txt      survival words in 12 languages used by the search (edit/extend freely)
+app/symptoms.txt     symptom checker table: ~90 symptoms (EN/NL/ES) and ~65 conditions with what to do
 app/kiwix.py         talks to kiwix-serve (Wikipedia etc.) and passes articles through
 app/static/          touchscreen UI (no external libraries, canvas map renderer)
 library/             the survival guide pages (Markdown, edit or add freely)
@@ -181,6 +182,9 @@ The installer downloads the Si4732 SSB patch once (`tools/get_ssb_patch.py`; it 
 ```bash
 python3 app/server.py --data data     # then open http://127.0.0.1:8080, ideally at 480x320
 ```
+
+## Symptom checker
+Type how you feel in the search, in English, Dutch or Spanish, e.g. `fever headache stiff neck`, `koorts hoofdpijn stijve nek` or `diarrea vómitos`. Above the other results, "What it could be" lists the common conditions that fit best, each marked EMERGENCY / DOCTOR / SELF-CARE; tap one for what to do now, other signs to check, the survival guide page and the WikiMed/Wikipedia article. Danger signs (chest pain, can't breathe, stiff neck, face drooping...) always show a red warning. It is a scored lookup in `app/symptoms.txt`, not AI and not a diagnosis; add symptoms or conditions there in a text editor (`python3 -m unittest tests.test_symptoms` checks the table).
 
 ## Search languages
 `app/lexicon.txt` has ~85 survival topics with their words in 12 languages; the first word of each language is what that language's Wikipedia is searched for. Add words or topics in any text editor. To add a language: add a column to every line and its code to `LANGS` in `app/search.py`. Typing in Arabic, Ukrainian or Russian works from a phone or laptop over the ⇄ hotspot (the on-screen keyboard is Latin letters only); place names are searched as typed.
