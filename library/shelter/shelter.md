@@ -11,8 +11,17 @@ The ground drains heat far faster than air. Make a bed of **20–30 cm** of dry 
 
 ## Quick shelters
 - **Tarp A-frame**: line between two trees at chest height, tarp over, edges pegged down. Low end into the wind.
+
+![Tarp A-frame (end view)](fig:tarp-a-frame.svg)
+
 - **Tarp lean-to**: one edge high, one pegged to the ground facing away from the wind; fire in front with a reflector wall behind it.
+
+![Tarp lean-to with fire and reflector](fig:tarp-lean-to.svg)
+
 - **Debris hut** (no tarp): a ridge pole from a stump or fork at hip height to the ground, ribs leaning on both sides, then **at least 60–90 cm** of leaves piled on top. Make it just big enough for your body, fill the inside with dry leaves too. Warm enough for cold nights without a sleeping bag if thick enough.
+
+![Debris hut](fig:debris-hut.svg)
+
 - **Snow**: a snow trench or quinzhee (heap, let settle 1–2 h, hollow out, walls 30 cm, vent hole). Snow insulates; never sleep directly on it.
 - In buildings: pick one small room, ideally interior and south-facing, close it off, hang blankets over windows and doors, everyone sleeps together.
 

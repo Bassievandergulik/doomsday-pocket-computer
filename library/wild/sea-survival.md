@@ -6,6 +6,9 @@
 - **Step up into the life raft**, don't step down: stay with the boat until it is really sinking. A boat is easier to find and safer than a raft.
 - Before you go: grab the grab bag, this device, **water**, warm clothes, a hat, the VHF/EPIRB, flares, a knife and a bucket.
 - Wear a lifejacket. In the water: **HELP position** (knees to chest, arms crossed) alone, **huddle** in a group. Don't swim to stay warm: it loses heat faster.
+
+![HELP position and huddle](fig:help-huddle.svg)
+
 - Cold water: the first minute brings gasping (cold shock). Keep your head out and breathe slowly before doing anything. You have about 10 minutes of useful movement, then about an hour before hypothermia makes you unconscious (less below 10 °C).
 
 ## In the raft: first actions

@@ -7,10 +7,18 @@ Fish are the easiest wild protein almost everywhere. Trapping and hunting are il
 
 **Improvised gear**
 - Hook: a safety pin, a bent nail or wire, a thorn (hawthorn, blackthorn), a "gorge" (a small sliver of bone or wood sharpened at both ends, tied in the middle, swallowed lengthwise with the bait).
+
+![Gorge hook](fig:gorge-hook.svg)
+
 - Line: thread from clothing, dental floss, inner strands of paracord, plant fibre ([Tools and cordage](page:wild/tools-and-cordage)).
 - Bait: worms, insects, grubs from rotten wood, small fish, fish guts. Bright cloth or foil as a lure.
 - **Night lines**: several baited lines tied to branches or a stake, checked morning and evening, catch more than you can by sitting.
 - **Fish trap**: a funnel of sticks or a cut plastic bottle with the neck turned inward; or stones laid in a V in a shallow stream with the point downstream, closed off behind.
+
+![Stone V-trap in a stream](fig:stone-trap.svg)
+
+![Bottle trap](fig:bottle-trap.svg)
+
 - Spear: a straight stick split into 4 prongs, wedged apart. Aim below where the fish seems to be (water bends light).
 
 **Preparing**: kill quickly with a blow behind the eyes. Gut within an hour: cut from the vent to the gills, remove everything inside and the dark blood line along the spine. Cook all freshwater fish thoroughly (parasites). Eat soon or dry/smoke it: [Food storage](page:food/storage).

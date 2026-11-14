@@ -8,6 +8,9 @@ Layers you can open and remove: a thin base layer (wool or synthetic, **no cotto
 ## Shelter in snow
 - **Snow trench**: dig a trench as long as you are and about 1 m deep, roof it with branches, a tarp or snow blocks. Quick and warm.
 - **Snow cave**: dig into a deep drift, the sleeping platform higher than the entrance (warm air rises, cold flows out). Make a **ventilation hole** with a stick in the roof and keep it open: carbon monoxide and CO2 build up from candles and stoves.
+
+![Snow cave: sleep higher than the entrance](fig:snow-cave.svg)
+
 - **Quinzhee**: pile snow 2 m high over your bags, wait 1–2 hours to set, dig it hollow, walls about 30 cm (push sticks in from outside as depth guides).
 - Insulate underneath with 10 cm of branches, a pack, a mat. Close the door with a pack or snow block.
 - Inside a snow shelter it stays around 0 °C even at −20 °C outside.
@@ -19,6 +22,9 @@ Layers you can open and remove: a thin base layer (wool or synthetic, **no cotto
 - Safe to walk only on clear, solid ice at least **10 cm** thick; snow-covered, grey or porous ice, ice near reeds, bridges and inflows is weak.
 - Spread your weight, carry a long pole crosswise, test ahead.
 - If you fall in: don't panic, the first minute is cold shock; turn back the way you came (that ice held), put arms on the ice, kick your legs horizontal and slide out on your belly. **Roll** away; don't stand up. Get dry and warm at once.
+
+![Getting out through ice](fig:ice-rescue.svg)
+
 - Rescuing someone: lie flat, reach with a branch, rope or scarf. Never go to them on foot.
 
 ## Snow and mountain dangers

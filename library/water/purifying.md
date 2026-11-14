@@ -23,6 +23,8 @@
 ## Improvised filter (pre-filter only, does not make water safe on its own)
 Bottle with the bottom cut off, upside down: cloth in the neck, then crushed charcoal (from your fire, not ash), fine sand, coarse sand, gravel on top. Pour slowly.
 
+![Improvised pre-filter](fig:bottle-filter.svg)
+
 ## Never drink
 - Seawater or urine (makes dehydration worse).
 - Water from car radiators, swimming pools long untreated, or flooded areas near chemicals.

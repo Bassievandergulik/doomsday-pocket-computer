@@ -8,23 +8,36 @@
 3. Open airway: one hand on the forehead, two fingers lift the chin, tilt the head back.
 4. Look, listen, feel for normal breathing for **up to 10 seconds**.
 
+![Open the airway: press the forehead, lift the chin](fig:cpr-airway.svg)
+
 ## 2. Breathing normally → recovery position
 1. Kneel beside them. Arm nearest you at a right angle, palm up.
 2. Other hand against their near cheek, back of hand.
 3. Pull the far knee up, roll them towards you onto their side.
 4. Tilt head back so the airway stays open. Check breathing every minute.
+
+![Recovery position in 3 steps](fig:recovery-position.svg)
+
 Suspected spine injury: only move them if the airway is at risk or the place is dangerous.
 
 ## 3. Not breathing normally → CPR (adult)
+
+![Where to push](fig:cpr-hands.svg)
+
 1. Heel of one hand in the **centre of the chest** (lower half of breastbone), other hand on top.
 2. Arms straight, push **5–6 cm deep**, **100–120 per minute** (beat of "Stayin' Alive").
 3. Let the chest come fully back up between pushes.
 4. After 30 compressions give **2 rescue breaths**: tilt head, pinch nose, seal your mouth on theirs, blow for 1 second until the chest rises.
 5. Continue **30 : 2**. Not willing or able to give breaths? Do continuous compressions only, still worth it.
+
+![Pushing: arms straight, shoulders over your hands](fig:cpr-compressions.svg)
+
 6. Swap rescuers every 2 minutes. Do not stop until help takes over, they wake and breathe normally, or you are exhausted.
 
 ## AED (defibrillator)
 Switch it on and follow the voice. Pads on bare chest: one below the right collarbone, one on the left side below the armpit. Nobody touches the patient during analysis and shock. Restart CPR straight after.
+
+![Where the AED pads go](fig:aed-pads.svg)
 
 ## Children (1 year to puberty)
 - Give **5 rescue breaths first**, then 30 : 2.

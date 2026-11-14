@@ -4,7 +4,13 @@ Make yourself big, bright and different from nature. Rescuers find people by **c
 
 ## Visual
 - **Signal mirror** (or phone screen, CD, polished lid): hold it near your eye, stretch the other arm with a V of two fingers around the target (plane, ship, hilltop), tilt the mirror until the light spot sits on your fingers, then rock it slightly. Visible for 10+ km in sun. Sweep the horizon even with nothing in sight.
+
+![Aiming a signal mirror](fig:signal-mirror.svg)
+
 - **Ground signals** at least 3 m tall in an open area: logs, stones, dug trenches, clothing. **V** need help, **X** need medical help, **SOS**.
+
+![Ground signals](fig:ground-signals.svg)
+
 - **Fire**: 3 fires in a triangle about 30 m apart. Day: smoke (add green leaves, wet moss). Dark ground: white smoke; snow: black smoke (rubber, oil).
 - **Light**: torch or this device's screen at full brightness in SOS pattern at night.
 - Spread bright clothing or a foil blanket (silver side out) in the open.
@@ -15,6 +21,9 @@ Make yourself big, bright and different from nature. Rescuers find people by **c
 
 ## Helicopters
 - Stand with your **back to the wind**, arms raised in a **Y** (yes, help). Do not wave one arm only (= "no help needed").
+
+![Signals to a helicopter](fig:helicopter-signals.svg)
+
 - Secure loose items, stay put, protect your eyes from dust, approach only when the crew signals you, from the front.
 
 ## Messages for others
