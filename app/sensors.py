@@ -63,6 +63,7 @@ class BME680:
         self.last = None
         self.dev = None
         self.error = None
+        self._read_lock = threading.Lock()
         try:
             import bme680 as lib
         except ImportError:
@@ -109,6 +110,10 @@ class BME680:
         """dict(temp_c, pressure_hpa, humidity, gas_ohm, air_quality 0-100 or None) or None."""
         if not self.available:
             return None
+        with self._read_lock:  # the weather thread and a "sample now" tap must not interleave
+            return self._read()
+
+    def _read(self):
         ok = False
         for _ in range(2):
             try:
