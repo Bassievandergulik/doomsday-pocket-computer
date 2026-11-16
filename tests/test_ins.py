@@ -350,5 +350,36 @@ class ImuDriverTest(unittest.TestCase):
         self.assertEqual(i._remap((1.0, 2.0, 3.0)), (2.0, -1.0, 3.0))
 
 
+class WiringDeadlockTest(unittest.TestCase):
+    """The app wires the INS and the dead reckoner into each other (server.py). With a GPS fix,
+    the dead reckoner's tick asks the INS whether GPS is trusted, and the INS asks the dead
+    reckoner for its estimate. That once froze the whole app; it must finish."""
+
+    def test_tick_with_gps_fix_does_not_hang(self):
+        import threading
+        import time as _t
+        store = {}
+        settings = (store.get, store.__setitem__)
+        fix = {"mode": 3, "lat": 52.09, "lon": 5.12, "speed": 0.0, "track": None, "hdop": 1.0,
+               "time_local": _t.time()}
+        get_fix = lambda: dict(fix)
+        holder = {}
+        ins = insmod.INS(None, lambda: None, get_fix, settings,
+                         get_ref=lambda: holder["dr"].reference() if "dr" in holder else None)
+        dr = deadreck.DeadReckoner(None, get_fix, lambda: None, lambda: None, settings, ins=ins)
+        holder["dr"] = dr
+
+        def work():
+            for i in range(5):
+                fix["time_local"] = _t.time() + i
+                dr.tick(_t.time() + i)
+                dr.estimate()
+                ins.gps_trusted(get_fix())
+        th = threading.Thread(target=work, daemon=True)
+        th.start()
+        th.join(5)
+        self.assertFalse(th.is_alive(), "dead reckoner and INS deadlocked")
+
+
 if __name__ == "__main__":
     unittest.main()
