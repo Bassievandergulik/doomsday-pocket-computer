@@ -530,7 +530,7 @@ class App:
         src = None
         ins = getattr(self, "ins", None)
         if ins is not None and ins.heading() is not None:
-            return {"heading": ins.heading(), "source": "ins", "compass": self.compass.available}
+            return {"heading": ins.heading(), "heading_source": "ins", "compass": self.compass.available}
         if self.compass.available:
             try:
                 h, src = self.compass.heading(), "compass"
