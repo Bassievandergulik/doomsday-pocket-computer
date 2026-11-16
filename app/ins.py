@@ -455,13 +455,19 @@ class INS:
         with self.lock:
             if key == self._vet_key:
                 return self._vet_result
+        # Ask the dead reckoner OUTSIDE our lock: it takes its own lock and may call back into
+        # gps_trusted(), so holding ours here would deadlock the two threads.
+        vehicle = bool(self.get_vehicle())
+        steps, ref = self.get_steps(), self.get_ref()
+        with self.lock:
+            if key == self._vet_key:  # another thread vetted this fix meanwhile
+                return self._vet_result
             self._vet_key = key
             t = self.clock()
             self.amax, self._amax_run = self._amax_run, 0.0
-            vehicle = bool(self.get_vehicle())
             self.monitor.max_speed = max(self.max_speed, 320.0) if vehicle else self.max_speed  # airliner ~250 m/s
             self.monitor.course_vs_heading = not vehicle
-            self.monitor.evaluate(t, f, self._snapshot(), self.get_steps(), self.get_ref())
+            self.monitor.evaluate(t, f, self._snapshot(), steps, ref)
             self._vet_result = not (self.spoof_action == "switch" and self.monitor.suspect(t))
             if self._vet_result and not vehicle and self.state in ("nav", "nav-degraded") and not self.monitor.suspect(t):
                 sp, tr = f.get("speed"), f.get("track")

@@ -172,13 +172,7 @@ class App:
                 return None
 
         def dr_ref():
-            if getattr(self, "dr", None) is None:
-                return None
-            e = self.dr.estimate()
-            if e:
-                return e["lat"], e["lon"], e["err_m"]
-            a = self.dr.anchor
-            return (a["lat"], a["lon"], 100.0) if a else None
+            return self.dr.reference() if getattr(self, "dr", None) is not None else None
 
         self.ins = ins_mod.INS(self.imu if self.config["ins_enabled"] else None, compass_true, self.gps.get,
                                (self.get_setting, self.set_setting), get_sea=lambda: getattr(self, "dr", None) is not None and self.dr.mode in ("boat", "vehicle"),

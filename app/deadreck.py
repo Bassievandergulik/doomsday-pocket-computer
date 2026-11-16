@@ -133,7 +133,7 @@ class DeadReckoner:
         self._get, self._set = settings
         self.rate_hz = rate_hz
         self.steps = StepDetector()
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.step_len = self._get("dr_step_len") or 0.72
         self.anchor = None      # {"lat","lon","t","source"}: where the estimate started
         self.pos = None         # current estimate (lat, lon)
@@ -265,6 +265,26 @@ class DeadReckoner:
             del self.track[:-2000]
 
     # --- what the rest of the app sees ------------------------------------
+    def _err(self):
+        age = time.time() - self.anchor["t"]
+        if self.mode == "boat":
+            err = 50 + 0.10 * self.dist + 0.25 * age  # current and leeway: ~0.5 kn unknown drift
+        elif self.mode == "vehicle":
+            err = 50 + 0.20 * self.dist  # speed changes (traffic, wind) are not measured: a rough guess
+        else:
+            err = 10 + 0.05 * self.dist
+        if self.anchor["source"] == "manual":
+            err += 100  # a tap on the map is not exact
+        return err
+
+    def reference(self):
+        """(lat, lon, error m) of the current estimate for the GPS spoof checks, or None.
+        Unlike estimate() it never asks whether GPS is trusted (that is what is being decided)."""
+        with self.lock:
+            if self.pos is None or self.anchor is None:
+                return None
+            return self.pos[0], self.pos[1], round(self._err())
+
     def estimate(self):
         """Current estimate when GPS has no fix: dict, or None if there is nothing to go on."""
         with self.lock:
@@ -272,15 +292,7 @@ class DeadReckoner:
                 return None
             if self.anchor["source"] == "gps" and self.dist == 0 and self._fix_ok(self.get_fix()):
                 return None
-            age = time.time() - self.anchor["t"]
-            if self.mode == "boat":
-                err = 50 + 0.10 * self.dist + 0.25 * age  # current and leeway: ~0.5 kn unknown drift
-            elif self.mode == "vehicle":
-                err = 50 + 0.20 * self.dist  # speed changes (traffic, wind) are not measured: a rough guess
-            else:
-                err = 10 + 0.05 * self.dist
-            if self.anchor["source"] == "manual":
-                err += 100  # a tap on the map is not exact
+            err = self._err()
             return {"lat": self.pos[0], "lon": self.pos[1], "err_m": round(err), "mode": self.mode,
                     "dist_m": round(self.dist), "since": self.anchor["t"], "from": self.anchor["source"],
                     "step_len": self.step_len, "steps": self.steps.count}
