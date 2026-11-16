@@ -122,7 +122,7 @@ The app runs as the `doomsday` systemd service on port 8080 and Chromium shows i
 |---|---|
 | Si4732 SDA / SCL | GPIO2 (pin 3) / GPIO3 (pin 5), 3.3 V, GND |
 | Si4732 RST / SEN | RST → GPIO23 (pin 16); SEN → GND (I2C address 0x11) |
-| Si4732 audio out | → PAM8403 amp → speaker, **and** → 10 µF capacitor + resistor divider → USB sound stick mic input |
+| Si4732 audio out | → PAM8406 amp (the USB sound stick's output joins it through 10 kΩ) → two 28 mm 8 Ω speakers, **and** → 10 µF capacitor + resistor divider → USB sound stick mic input |
 | Si4732 antennas | FM: ~75 cm wire. AM/SW input: 5–10 m long wire, as high as possible |
 | BME680 | same bus, 3.3 V, CS and SDO tied to 3.3 V on the module (I2C, address 0x77) |
 | LTR390 UV (DFRobot Gravity SEN0540) | same bus, 3.3 V, switch set to I2C (address 0x1C; a bare LTR390 breakout is 0x53) |
@@ -169,7 +169,8 @@ The installer downloads the Si4732 SSB patch once (`tools/get_ssb_patch.py`; it 
 | `audio_device` | sound stick for fax/RTTY: `auto` or e.g. `plughw:1,0` |
 | `airband_gain` | RTL-SDR tuner gain in dB (default 40) |
 | `airband_ppm` | RTL-SDR frequency correction in ppm (default 0). Generic RTL2832U + R820T2 sticks can drift tens of ppm: tune a known station (e.g. an airport ATIS) and adjust until it's clear |
-| `sw_capture_volume`, `sw_keep_audio` | radio volume while recording (0–63; lower it if charts look smeared, raise it if the sound level bar stays low) and whether to keep the WAV files |
+| `sw_capture_volume`, `sw_keep_audio` | radio volume while recording (0–63; lower it if charts look smeared, raise it if the sound level bar stays low; it can't go above the speaker cap below, so if fax audio is too weak, raise the 1 kΩ resistor of the mic divider instead) and whether to keep the WAV files |
+| `speaker_max_pct` | the loudest the app lets the radio and the USB sound stick go, in % of their range (default 35). The 28 mm speakers are rated 0.25 W and are damaged at full volume. At start-up the app also makes the USB sound stick the default sound output, so video sound reaches the amplifier |
 | `gps_serial`, `gps_baud` | if not using gpsd |
 | `start_view` | `[lat, lon, zoom]` shown before a GPS fix (and the forecast location without GPS) |
 | `forecast_auto_download` | `true` (default): refresh the forecast whenever internet is available (checked every 30 min, refreshed when older than 3 h); `false`: never connect |

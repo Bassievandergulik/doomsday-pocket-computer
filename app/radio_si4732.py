@@ -254,8 +254,11 @@ class Si4732:
             self.rds_ps = [" "] * 8
         return self.status()
 
+    volume_limit = None  # set by the app to protect small speakers (speaker_max_pct)
+
     def set_volume(self, v):
-        self.volume = max(0, min(63, int(v)))
+        top = self.volume_max if self.volume_limit is None else min(self.volume_max, self.volume_limit)
+        self.volume = max(0, min(top, int(v)))
         with self.lock:
             self._prop(RX_VOLUME, self.volume)
         return self.volume
@@ -293,7 +296,7 @@ class Si4732:
         self.freq = (r[2] << 8) | r[3]
         out = {"available": True, "band": self.band, "mode": self.mode, "freq": self.freq,
                "rssi": r[4], "snr": r[5], "valid": bool(r[1] & 0x01), "volume": self.volume,
-               "volume_max": self.volume_max}
+               "volume_max": self.volume_max if self.volume_limit is None else min(self.volume_max, self.volume_limit)}
         if self.mode == "fm":
             out["label"] = "%.1f MHz" % (self.freq / 100)
             ps = "".join(self.rds_ps).strip()

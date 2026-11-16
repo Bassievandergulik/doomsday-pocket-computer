@@ -11,6 +11,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "app"))
+sys.path.insert(0, os.path.join(ROOT, "tests"))
 
 import sensors  # noqa: E402
 
@@ -186,6 +187,58 @@ class Si4732ResetTest(unittest.TestCase):
         self.assertEqual(fake.opened, 1, "one GPIO handle for the life of the app")
         self.assertEqual(fake.closed, 0, "closing it would let RST float")
         self.assertEqual(fake.writes[-1], (23, 1), "RST ends high (radio running)")
+
+
+class SpeakerLimitTest(unittest.TestCase):
+    """28 mm 0.25 W speakers: the app caps the radio and the USB sound card (speaker_max_pct)."""
+
+    def test_radio_volume_is_capped(self):
+        import radio_si4732 as si
+        if si.i2c_msg is None:
+            self.skipTest("smbus2 not installed")
+        from test_core import FakeSiBus
+        r = si.Si4732(FakeSiBus(), reset_gpio=None)
+        r.volume_limit = 63 * 35 // 100
+        self.assertEqual(r.set_volume(63), 22)
+        self.assertEqual(r.set_volume(10), 10)
+        self.assertEqual(r.status()["volume_max"], 22, "the volume slider tops out at the cap")
+
+    def test_rda_volume_is_capped(self):
+        import radio_rda5807 as rda
+        r = rda.RDA5807M.__new__(rda.RDA5807M)
+        r.volume_limit, r.available, r.lock = 5, False, threading.Lock()
+        r._write_volume = lambda: None
+        self.assertEqual(r.set_volume(15), 5)
+
+    def test_usb_card_becomes_default_and_is_capped(self):
+        import tempfile
+        import audio
+        calls = []
+
+        class Done:
+            def __init__(self, out=""):
+                self.stdout = out
+
+        def run(cmd, **kw):
+            calls.append(cmd)
+            if cmd[:2] == ["aplay", "-l"]:
+                return Done("card 0: Headphones [bcm2835 Headphones], device 0: x\n"
+                            "card 2: Device [USB Audio Device], device 0: USB Audio [USB Audio]\n")
+            if "scontrols" in cmd:
+                return Done("Simple mixer control 'Speaker',0\nSimple mixer control 'Mic',0\n"
+                            "Simple mixer control 'Auto Gain Control',0\n")
+            return Done()
+        orig = audio.subprocess.run
+        audio.subprocess.run = run
+        try:
+            with tempfile.TemporaryDirectory() as home:
+                self.assertEqual(audio.setup_playback("auto", 35, home=home), "Device")
+                rc = open(os.path.join(home, ".asoundrc")).read()
+        finally:
+            audio.subprocess.run = orig
+        self.assertIn("defaults.pcm.card Device", rc)
+        sets = [c for c in calls if "sset" in c]
+        self.assertEqual(sets, [["amixer", "-q", "-c", "2", "sset", "Speaker,0", "35%", "unmute"]])
 
 
 if __name__ == "__main__":

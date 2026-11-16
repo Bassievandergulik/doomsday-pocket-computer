@@ -118,8 +118,11 @@ class RDA5807M:
             self.rds_ps = [" "] * 8
         return self.status()
 
+    volume_limit = None  # set by the app to protect small speakers (speaker_max_pct)
+
     def set_volume(self, v):
-        self.volume = max(0, min(self.volume_max, int(v)))
+        top = self.volume_max if self.volume_limit is None else min(self.volume_max, self.volume_limit)
+        self.volume = max(0, min(top, int(v)))
         with self.lock:
             self._write_volume()
         return self.volume
@@ -154,7 +157,7 @@ class RDA5807M:
         out = {"available": True, "band": "FM", "mode": "fm", "freq": self.freq,
                "label": "%.1f MHz" % (self.freq / 100), "rssi": r >> 9, "snr": None,
                "valid": bool(r & 0x0100), "stereo": bool(s & ST),
-               "volume": self.volume, "volume_max": self.volume_max}
+               "volume": self.volume, "volume_max": self.volume_max if self.volume_limit is None else min(self.volume_max, self.volume_limit)}
         ps = "".join(self.rds_ps).strip()
         if ps:
             out["rds"] = ps

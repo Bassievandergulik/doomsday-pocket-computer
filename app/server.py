@@ -33,6 +33,7 @@ from forecast import Forecaster  # noqa: E402
 import hotspot as hotspot_mod  # noqa: E402
 import exports  # noqa: E402
 import shortwave as shortwave_mod  # noqa: E402
+import audio  # noqa: E402
 import deadreck  # noqa: E402
 import airband as airband_mod  # noqa: E402
 import light as light_mod  # noqa: E402
@@ -56,7 +57,9 @@ DEFAULT_CONFIG = {
     "radio_reset_gpio": 23,             # Si4732 RST pin
     "ssb_patch": "ssb_patch.bin",       # in the data folder; made by tools/get_ssb_patch.py
     "audio_device": "auto",             # USB sound stick for weather fax / RTTY ("auto" or e.g. "plughw:1,0")
-    "sw_capture_volume": 45,            # radio volume (0-63) while recording a fax / RTTY
+    "sw_capture_volume": 45,            # radio volume (0-63) while recording a fax / RTTY (also capped by speaker_max_pct)
+    "speaker_max_pct": 35,              # loudest the app lets the radio and the USB sound card go: the 28 mm speakers
+                                        # (0.25 W) are damaged at full volume. 100 = no limit
     "sw_keep_audio": False,
     "airband_gain": 40,
     "airband_ppm": 0,                   # RTL-SDR frequency correction in ppm (measure with a known station; cheap sticks drift)
@@ -141,10 +144,12 @@ class App:
         patch = patch if os.path.isabs(patch) else self._find_data_file(patch)
         self.radio = radio_mod.open_radio(bus, self.config["radio_chip"], self.config["radio_address"],
                                           self.config["radio_reset_gpio"], ssb_patch=patch)
+        cap = max(1, min(100, int(self.config["speaker_max_pct"])))
         if self.radio.available:
             r = self.radio
+            r.volume_limit = max(1, r.volume_max * cap // 100)
             vol = self.get_setting("radio_volume")
-            r.set_volume(vol if vol is not None else r.volume_max * 2 // 3)
+            r.set_volume(vol if vol is not None else r.volume_limit)
             last = self.get_setting("radio_last")
             if last:
                 try:
@@ -157,6 +162,8 @@ class App:
                                                  self.config["audio_device"], self.config["sw_capture_volume"],
                                                  self.config["sw_keep_audio"])
         self.shortwave.start_scheduler()
+        # USB sound card (airband, videos -> amplifier -> speakers): make it the default output and cap its level
+        threading.Thread(target=audio.setup_playback, args=(self.config["audio_device"], cap), daemon=True).start()
 
         # dead reckoning: keeps an estimated position when GPS has no fix
         self.dr = deadreck.DeadReckoner(self.imu, self.gps.get, lambda: self.heading()["heading"],

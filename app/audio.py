@@ -30,6 +30,51 @@ def find_device(setting="auto", playback=False):
     return "plughw:%s,%s" % (usb[0][0], usb[0][3])
 
 
+def _usb_card(setting="auto"):
+    """(index, id) of the playback card the amplifier is fed from, or None."""
+    if setting and setting != "auto":
+        m = re.match(r"(?:plug)?hw:(\w+)", setting)
+        return (m.group(1), m.group(1)) if m else None
+    try:
+        out = subprocess.run(["aplay", "-l"], capture_output=True, text=True, timeout=10).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    cards = re.findall(r"^card (\d+): (\S+) \[(.*?)\]", out, re.M)
+    usb = [c for c in cards if "usb" in (c[1] + c[2]).lower()]
+    return (usb[0][0], usb[0][1]) if usb else None
+
+
+def setup_playback(setting="auto", max_pct=35, home=None):
+    """Make the USB sound card the default ALSA output (so the browser's video sound reaches the
+    amplifier, not the Pi's unused headphone jack) and set every playback control on it to
+    max_pct of its range, to protect the small speakers. Returns the card id or None."""
+    card = _usb_card(setting)
+    if card is None:
+        return None
+    idx, cid = card
+    home = home or os.path.expanduser("~")
+    rc = os.path.join(home, ".asoundrc")
+    want = "# written by the doomsday app: USB sound card -> amplifier\ndefaults.pcm.card %s\ndefaults.ctl.card %s\n" % (cid, cid)
+    try:
+        old = open(rc).read() if os.path.exists(rc) else None
+        if old is None or old.startswith("# written by the doomsday app"):
+            if old != want:
+                with open(rc, "w") as f:
+                    f.write(want)
+    except OSError:
+        pass
+    try:
+        ctls = subprocess.run(["amixer", "-c", idx, "scontrols"], capture_output=True, text=True, timeout=10).stdout
+        for name in re.findall(r"Simple mixer control '([^']+)',(\d+)", ctls):
+            if any(w in name[0].lower() for w in ("mic", "capture", "auto gain")):
+                continue
+            subprocess.run(["amixer", "-q", "-c", idx, "sset", "%s,%s" % name, "%d%%" % max_pct, "unmute"],
+                           capture_output=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return cid
+
+
 class Recorder:
     """Records one WAV file in the background; stop() ends it early."""
 
