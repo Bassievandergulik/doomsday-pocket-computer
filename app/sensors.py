@@ -1,10 +1,11 @@
-"""I2C sensors: BME280 weather sensor and an optional BMM150, QMC5883L or HMC5883L compass.
+"""I2C sensors: BME680 or BME280 weather, LTR390 UV, BMM150 (or QMC5883L/HMC5883L) compass, UPS battery.
 
 Everything here degrades gracefully: if smbus2 or the chip is missing the
 sensor reports `available = False` and the rest of the app keeps working.
 """
 import math
 import struct
+import threading
 import time
 
 try:
@@ -13,11 +14,36 @@ except ImportError:  # not on a Pi, or smbus2 not installed
     SMBus = None
 
 
+class LockedBus:
+    """One SMBus shared safely by several threads.
+
+    smbus2 picks the chip with one system call (I2C_SLAVE) and talks to it with a second
+    one, and it remembers the last address to skip the first call. Two threads using the
+    same SMBus at once (the step counter at 50 Hz, the weather sensor, the compass, the
+    battery monitor, the radio) can therefore send a read to the wrong chip. Every bus call
+    goes through one lock here, so each call is complete before the next one starts.
+    """
+
+    def __init__(self, bus):
+        self._bus = bus
+        self._lock = threading.RLock()
+
+    def __getattr__(self, name):
+        attr = getattr(self._bus, name)
+        if not callable(attr):
+            return attr
+
+        def locked(*args, **kwargs):
+            with self._lock:
+                return attr(*args, **kwargs)
+        return locked
+
+
 def open_bus(bus=1):
     if SMBus is None:
         return None
     try:
-        return SMBus(bus)
+        return LockedBus(SMBus(bus))
     except OSError:
         return None
 
@@ -44,6 +70,11 @@ class BME680:
             return
         if bus is None:
             return
+        # One forced reading (8x/4x/2x oversampling + 150 ms gas heater) takes about 190 ms, but the
+        # library only waits 10 x 10 ms for it and then reports failure. Give it 10 x 40 ms.
+        for mod in (lib, getattr(lib, "constants", None)):
+            if mod is not None and hasattr(mod, "POLL_PERIOD_MS"):
+                mod.POLL_PERIOD_MS = 40
         for a in addresses:
             try:
                 self.dev = lib.BME680(i2c_addr=a, i2c_device=bus)
@@ -53,14 +84,23 @@ class BME680:
         if self.dev is None:
             return
         d = self.dev
-        d.set_humidity_oversample(lib.OS_2X)
-        d.set_pressure_oversample(lib.OS_4X)
-        d.set_temperature_oversample(lib.OS_8X)
-        d.set_filter(lib.FILTER_SIZE_3)
-        d.set_gas_status(lib.ENABLE_GAS_MEAS)
-        d.set_gas_heater_temperature(320)
-        d.set_gas_heater_duration(150)
-        d.select_gas_heater_profile(0)
+        try:
+            d.set_humidity_oversample(lib.OS_2X)
+            d.set_pressure_oversample(lib.OS_4X)
+            d.set_temperature_oversample(lib.OS_8X)
+            d.set_filter(lib.FILTER_SIZE_3)
+            d.set_gas_status(lib.ENABLE_GAS_MEAS)
+            # the heater setting is worked out from the air temperature, so take one reading first
+            if getattr(d, "ambient_temperature", 0) is None:
+                d.get_sensor_data()
+            if getattr(d, "ambient_temperature", 0) is None:
+                d.ambient_temperature = 2000  # 20.00 C until the first real reading
+            d.set_gas_heater_temperature(320)
+            d.set_gas_heater_duration(150)
+            d.select_gas_heater_profile(0)
+        except Exception as e:  # a sensor problem must never stop the whole app from starting
+            self.error = "BME680 set-up failed: %r" % e
+            return
         self.lib = lib
         self.started = time.time()
         self.available = True
@@ -69,7 +109,16 @@ class BME680:
         """dict(temp_c, pressure_hpa, humidity, gas_ohm, air_quality 0-100 or None) or None."""
         if not self.available:
             return None
-        if not self.dev.get_sensor_data():
+        ok = False
+        for _ in range(2):
+            try:
+                ok = self.dev.get_sensor_data()
+            except Exception:  # I/O error, or the library choking on a garbled reading
+                ok = False
+            if ok:
+                break
+            time.sleep(0.2)
+        if not ok:
             return None
         d = self.dev.data
         out = {"temp_c": round(d.temperature, 2), "pressure_hpa": round(d.pressure, 2),
@@ -388,7 +437,7 @@ class Compass:
 
 
 class Battery:
-    """INA219 battery monitor, as on the Waveshare UPS HAT (C) for the Pi Zero (address 0x43).
+    """INA219 battery monitor on the Waveshare UPS HAT (D) (address 0x43; also on the UPS HAT (C)).
 
     Only the battery voltage is used: percentage is a rough single-cell Li-ion
     curve, and the device shuts down cleanly when the cell is nearly empty, so

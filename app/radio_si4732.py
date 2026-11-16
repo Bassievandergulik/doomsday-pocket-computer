@@ -104,12 +104,20 @@ class Si4732:
             import lgpio
         except (ImportError, OSError):
             return  # RST tied high through an RC network instead
-        h = lgpio.gpiochip_open(0)
-        lgpio.gpio_claim_output(h, self.reset_gpio, 0)
-        time.sleep(0.01)
-        lgpio.gpio_write(h, self.reset_gpio, 1)
-        time.sleep(0.01)
-        lgpio.gpiochip_close(h)
+        # Keep the GPIO handle open for as long as the app runs: closing it frees the line, and
+        # the Pi's GPIO driver may then switch the pin back to an input, leaving RST floating
+        # (the radio could drop into reset). Opened once, so a second reset reuses it.
+        try:
+            if getattr(self, "_gpio", None) is None:
+                self._gpio = lgpio.gpiochip_open(0)
+                lgpio.gpio_claim_output(self._gpio, self.reset_gpio, 0)
+            h = self._gpio
+            lgpio.gpio_write(h, self.reset_gpio, 0)
+            time.sleep(0.01)
+            lgpio.gpio_write(h, self.reset_gpio, 1)
+            time.sleep(0.01)
+        except Exception as e:  # lgpio raises its own error type; report it as "radio not found"
+            raise OSError("reset pin GPIO%s: %s" % (self.reset_gpio, e))
 
     def _cmd(self, cmd, args=(), resp_len=1, timeout=0.5):
         self.bus.i2c_rdwr(i2c_msg.write(self.addr, [cmd] + list(args)))
