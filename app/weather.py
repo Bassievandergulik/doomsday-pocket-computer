@@ -100,8 +100,8 @@ class WeatherStation:
         while True:
             try:
                 self.sample()
-            except OSError:
-                pass
+            except Exception as e:  # never let one bad reading stop the weather log for good
+                print("weather sample failed: %r" % e, flush=True)
             time.sleep(self.interval_s)
 
     def sample(self):

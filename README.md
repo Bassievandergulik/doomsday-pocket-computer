@@ -22,14 +22,14 @@ No internet needed after setup.
 
 **Durability (software side):** the installer keeps logs in RAM, turns off the swap file and access-time writes to spare the SD card, repairs the file system automatically after a power cut, enables the hardware watchdog (the Pi reboots itself if it ever freezes), and the app restarts by itself if it crashes. Your data is stored in a power-cut-safe database mode. With the UPS HAT fitted, the battery level shows in the top bar and the device shuts down cleanly before the battery is empty, so the card is never cut off mid-write.
 
-Every piece of hardware is optional: without GPS the map works from the map centre, without a compass the arrow is relative to north (or your GPS course while walking), without the radio or BME280 those tabs say so.
+Every piece of hardware is optional: without GPS the map works from the map centre, without a compass the arrow is relative to north (or your GPS course while walking), without the radio or weather sensor those tabs say so.
 
 ## Layout
 ```
 app/server.py        web server + API (Python standard library only)
 app/geo.py           geometry, distance/bearing, UTM, sun times
 app/gps.py           gpsd or raw NMEA serial GPS reader
-app/sensors.py       BME280 weather sensor, BMM150/QMC5883L/HMC5883L compass
+app/sensors.py       BME680/BME280 weather, LTR390 UV, BMM150/QMC5883L/HMC5883L compass, UPS battery
 app/radio.py         picks the radio driver from config (radio_chip)
 app/radio_si4732.py  Si4732/Si4735 FM/AM/SW/SSB driver (default), loads the SSB patch
 app/radio_rda5807.py RDA5807M FM-only driver (alternative)
@@ -39,7 +39,8 @@ app/hotspot.py       direct WiFi hotspot (NetworkManager)
 app/exports.py       uploads and downloads for the computer (GPX, CSV, backup)
 app/shortwave.py     weather fax / RTTY receptions: stations, schedule, recording, decoding
 app/audio.py         USB sound stick capture (arecord)
-app/deadreck.py      MPU-6050 step counter + dead reckoning (on foot / boat)
+app/deadreck.py      MPU-6050 / ICM-42688-P step counter + dead reckoning (on foot / boat)
+app/ins.py           IRS-style inertial heading (alignment, Kalman filter) + GPS spoof checks
 app/airband.py       VHF airband listening and scanning via rtl_fm
 app/wefax.py, rtty.py  weather fax and RTTY decoders (numpy)
 tools/get_ssb_patch.py downloads the Si4732 SSB patch once (not included: not ours to distribute)
@@ -99,7 +100,7 @@ Download `.zim` files from https://library.kiwix.org (or https://download.kiwix.
 
 Search for "khan" on library.kiwix.org for Khan Academy collections. Pick what fits: a 256 GB card holds English Wikipedia with pictures plus Dutch and Spanish without pictures and WikiMed. Every official Wikipedia ZIM has a full-text index, so every word is searchable (expect 1–5 s per library on the Pi 3 B+).
 
-**Videos** (e.g. Khan Academy downloads): put them in `data/videos/<Subject>/`, `.mp4` or `.webm`, at 360p/480p to save space. A subtitle file with the same name (`.vtt`/`.srt`) makes everything said in the video searchable. Sound needs an audio output (I2S amp board or USB sound stick): the Pi Zero has none built in.
+**Videos** (e.g. Khan Academy downloads): put them in `data/videos/<Subject>/`, `.mp4` or `.webm`, at 360p/480p to save space. A subtitle file with the same name (`.vtt`/`.srt`) makes everything said in the video searchable. Sound plays through the USB sound stick and the amplifier.
 
 After adding guide pages or videos, the search picks them up on the next restart (or `curl -X POST http://127.0.0.1:8080/api/find/reload`).
 
@@ -122,11 +123,13 @@ The app runs as the `doomsday` systemd service on port 8080 and Chromium shows i
 |---|---|
 | Si4732 SDA / SCL | GPIO2 (pin 3) / GPIO3 (pin 5), 3.3 V, GND |
 | Si4732 RST / SEN | RST → GPIO23 (pin 16); SEN → GND (I2C address 0x11) |
-| Si4732 audio out | → PAM8403 amp → speaker, **and** → 10 µF capacitor + resistor divider → USB sound stick mic input |
+| Si4732 audio out | → PAM8406 amp (the USB sound stick's output joins it through 10 kΩ) → two 28 mm 8 Ω speakers, **and** → 10 µF capacitor + resistor divider → USB sound stick mic input |
 | Si4732 antennas | FM: ~75 cm wire. AM/SW input: 5–10 m long wire, as high as possible |
-| USB sound stick | via a micro-USB OTG adapter in the Zero's **data** port (the one marked USB, not PWR) |
-| BME280 SDA / SCL | same bus, address 0x76 or 0x77, 3.3 V |
-| BMM150 compass (optional; QMC5883L and HMC5883L also work) | same bus (0x13 on the DFRobot Fermion board), mount flat away from the speaker magnet |
+| BME680 | same bus, 3.3 V, CS and SDO tied to 3.3 V on the module (I2C, address 0x77) |
+| LTR390 UV (DFRobot Gravity SEN0540) | same bus, 3.3 V, switch set to I2C (address 0x1C; a bare LTR390 breakout is 0x53) |
+| BMM150 compass (DFRobot SEN0419) | VCC pin 1, GND pin 30, SDI pin 3, SCK pin 5, **CS → GPIO5 (pin 29), PS → GPIO6 (pin 31)**, both driven high at boot by `gpio=5,6=op,dh` (address 0x13; CS on GND gives 0x11, which clashes with the radio). Mount flat away from the speaker magnets and the cells |
+| UPS HAT (D) | under the Pi on pogo pins: battery monitor INA219 at 0x43, its MCU at 0x2D |
+| Power button | between GPIO3 (pin 5, SCL) and GND: wakes a halted Pi. Don't add `dtoverlay=gpio-shutdown`, it fights the I2C bus on that pin |
 | GPS (u-blox NEO-6M/M8N) TX → RX | GPIO15 (pin 10); GPS RX ← GPIO14 (pin 8); or use a USB GPS |
 
 | RGB LED green / red / blue die | MOSFET gates on GPIO12 (pin 32) / GPIO13 (pin 33) / GPIO16 (pin 36). Series resistor per die from 5 V, about 250 mA: red 4× 47 Ω ¼ W in parallel (≈12 Ω), green and blue each 3× 22 Ω ¼ W in parallel (≈7 Ω) |
@@ -134,9 +137,9 @@ The app runs as the `doomsday` systemd service on port 8080 and Chromium shows i
 | DS3231 clock | same I2C bus, 3.3 V |
 | RTL-SDR stick + USB sound stick | plugged straight into two of the Pi's USB-A ports (the 4-port hub is no longer needed) |
 
-Check with `i2cdetect -y 1` (expect 11 Si4732, 76 BME280, 0d compass, 43 UPS HAT, 68 DS3231 shown as UU once its driver loads, 69 MPU-6050), `arecord -l` (sound stick), `rtl_test -t` (SDR stick) and `cgps` (GPS).
+Check with `i2cdetect -y 1` (expect 11 Si4732, 13 BMM150 compass, 1c LTR390 UV, 2d + 43 UPS HAT, 68 DS3231 shown as UU once its driver loads, 69 MPU-6050, 77 BME680). Keep the bus at the default 100 kHz: all modules' pull-ups together are about 1.2 kΩ, `arecord -l` (sound stick), `rtl_test -t` (SDR stick) and `cgps` (GPS).
 
-Keep the BME280 away from the Pi CPU (on a short cable or outside the case), or the temperature reads several degrees high. Pressure (the forecast) is unaffected.
+Keep the BME680 away from the Pi CPU (on a short cable or outside the case), or the temperature reads several degrees high. Pressure (the forecast) is unaffected.
 
 ## Weather fax and RTTY
 The installer downloads the Si4732 SSB patch once (`tools/get_ssb_patch.py`; it comes from the PU2CLR SI4735 library and is for personal, non-commercial use, so it is not part of this package). Without it FM/AM/SW still work and the fax section says what is missing. A reception tunes the radio to USB about 1.9 kHz below the station's listed frequency, records the sound stick at 8 kHz, puts the radio back, then decodes in a low-priority process (about a minute for a 12-minute chart on the Pi 3 B+). The fax decoder finds the exact tone frequency by itself (radio crystals are often a few hundred Hz off on shortwave) and corrects sound-card clock drift (slant). Results are in `data/shortwave/` and can be downloaded over the hotspot. The station list (`app/shortwave.py`) and frequencies need checking against current schedules; add daily times on the device.
@@ -146,11 +149,22 @@ The installer downloads the Si4732 SSB patch once (`tools/get_ssb_patch.py`; it 
 
 **Messages (Meshtastic):** plug a Meshtastic node (Heltec or LilyGO LoRa board) into a USB port of the Pi. The ⇄ tab's "Messages" section lists messages and nearby nodes, sends short text (on-screen keyboard), and shares your position. Needs `pip install meshtastic`. Untested with real nodes.
 
+**Inertial navigation (INS) and GPS spoof checks** (`app/ins.py`). Works like an aircraft IRS, scaled down to a MEMS chip. The chip is the **ICM-42688-P** (about EUR 12, 5 to 10 times quieter than the MPU-6050; the MPU-6050 still works, just rougher). It does not integrate acceleration into position (that is kilometres off within minutes, even a EUR 300 chip). What it does:
+
+1. **Align**: hold the device still for 30 s (on a boat, in Boat mode: 60 s, rocking is fine). It measures the gyro zero offset, takes "up" from gravity and north from the compass. The Go tab shows `ALIGN 40%`, then `NAV`. Press *Align* to redo it.
+2. **Gyro-stabilised heading**: a small Kalman filter (heading plus gyro bias) trusts the gyro in the short term and the compass and GPS course slowly in the long term. A rolling boat, a heeled device or a magnet nearby barely moves it. This heading replaces the raw compass everywhere (map arrow, dead reckoning). In Boat mode the estimate also follows every turn the gyro feels after GPS is lost.
+3. **Spoof checks**: every new GPS fix is compared with what the sensors felt: a position jump, a position that does not match its own speed, a speed or direction change with no push on the accelerometer, a course change the gyro did not feel, steps counted while GPS says you stand still. Two points of evidence make the GPS *suspect*: the status bar says `GPS SUSPECT`, the fix is ignored and the position comes from dead reckoning, anchored on the last trusted fix. It returns by itself after 5 quiet minutes if GPS agrees with the estimate again, or press *Trust GPS* (30 minutes). `ins_spoof_action: "warn"` only warns and keeps using GPS.
+
+**In a car, plane or on a bike** choose *Car/bike/plane* under "Without GPS". Alignment then tolerates vibration and movement, the estimate carries on with the last GPS speed and course (or a speed in km/h you type) turned by the gyro, the jump limit rises to 320 m/s for aircraft, and GPS course is no longer used to correct the heading, because the device may sit at any angle to the direction of travel. In a banked turn the gyro sees about 10% less turn than there is (at 25 deg bank). Speed changes in traffic are not measured, so the estimate's error grows with 20% of the distance.
+
+Honest limits: a spoofer who drags the position slowly at a steady speed feels like normal motion and is only caught once it exceeds the dead-reckoning error; with no GPS at all, position still comes from speed times heading (nothing affordable measures speed through the water or the current), so after an hour at sea expect kilometres, not metres. A real INS (ring-laser gyros) drifts 0.01 deg/h, the ICM-42688-P roughly 10 to 50 deg/h. Not done: a clock cross-check against the DS3231 and GPS signal-strength checks. Power: the chip draws about 1 mA and the filter a few percent of one core. Settings in `config.json`: `ins_enabled`, `ins_mount`, `ins_spoof_action`, `ins_compass_sigma`, `ins_max_speed_ms`. All of it is tested on simulated sensors only (`tests/test_ins.py`), never on a real chip or a real spoofer.
+
+
 **Board:** Raspberry Pi 3 Model B+ (1 GB), the default. Its UPS HAT (D) wakes the Pi with I2C; the battery readout works at 0x43. Optional: set the HAT's auto power-on by writing 0x55 to register 0x01 of its MCU at 0x2D (`i2cset -y 1 0x2d 0x01 0x55`), so it starts when charging. Untested.
 
 **Other boards:** See [docs/boards.md](docs/boards.md) for what a Radxa Zero 3W would need. Not tested.
 
-**Air and UV (weather tab):** a BME680 (I2C 0x76/0x77) gives pressure, temperature, humidity and a gas reading. The air quality is relative to the cleanest air seen after 5 minutes of warm-up, so it shows *change* (smoke, fumes), not an absolute level. Needs `pip install bme680`. An LTR390 (I2C 0x53) gives a UV index with a sunburn warning; it's calibrated approximately. Both untested on hardware.
+**Air and UV (weather tab):** a BME680 (I2C 0x76/0x77) gives pressure, temperature, humidity and a gas reading. The air quality is relative to the cleanest air seen after 5 minutes of warm-up, so it shows *change* (smoke, fumes), not an absolute level. Needs `pip install bme680`. An LTR390 (DFRobot board at 0x1C, or a bare breakout at 0x53) gives a UV index with a sunburn warning; it's calibrated approximately. Both are detected on the real Pi; the UV daylight reading and the BME680 gas reading still need an outdoor check.
 
 **Clock:** a DS3231 clock chip keeps time while off (`dtoverlay=i2c-rtc,ds3231`); GPS time and a computer on the hotspot correct it, or tap the clock on screen.
 
@@ -167,7 +181,8 @@ The installer downloads the Si4732 SSB patch once (`tools/get_ssb_patch.py`; it 
 | `audio_device` | sound stick for fax/RTTY: `auto` or e.g. `plughw:1,0` |
 | `airband_gain` | RTL-SDR tuner gain in dB (default 40) |
 | `airband_ppm` | RTL-SDR frequency correction in ppm (default 0). Generic RTL2832U + R820T2 sticks can drift tens of ppm: tune a known station (e.g. an airport ATIS) and adjust until it's clear |
-| `sw_capture_volume`, `sw_keep_audio` | radio volume while recording (0–63; lower it if charts look smeared, raise it if the sound level bar stays low) and whether to keep the WAV files |
+| `sw_capture_volume`, `sw_keep_audio` | radio volume while recording (0–63; lower it if charts look smeared, raise it if the sound level bar stays low; it can't go above the speaker cap below, so if fax audio is too weak, raise the 1 kΩ resistor of the mic divider instead) and whether to keep the WAV files |
+| `speaker_max_pct` | the loudest the app lets the radio and the USB sound stick go, in % of their range (default 35). The 28 mm speakers are rated 0.25 W and are damaged at full volume. At start-up the app also makes the USB sound stick the default sound output, so video sound reaches the amplifier |
 | `gps_serial`, `gps_baud` | if not using gpsd |
 | `start_view` | `[lat, lon, zoom]` shown before a GPS fix (and the forecast location without GPS) |
 | `forecast_auto_download` | `true` (default): refresh the forecast whenever internet is available (checked every 30 min, refreshed when older than 3 h); `false`: never connect |
