@@ -35,6 +35,7 @@ import exports  # noqa: E402
 import shortwave as shortwave_mod  # noqa: E402
 import audio  # noqa: E402
 import deadreck  # noqa: E402
+import ins as ins_mod  # noqa: E402
 import airband as airband_mod  # noqa: E402
 import light as light_mod  # noqa: E402
 import mesh as mesh_mod  # noqa: E402
@@ -69,6 +70,11 @@ DEFAULT_CONFIG = {
     "light_red_gpio": 13,               # MOSFET gate of the red LED (PWM pin)
     "light_blue_gpio": 16,              # 3 W RGB LED: 12 = green die, 13 = red die, 16 = blue die. None = separate white + red LEDs
     "i2c_bus": 1,
+    "ins_enabled": True,                # IRS-style inertial heading + GPS spoof checks (needs the gyro chip)
+    "ins_mount": ["x", "y", "z"],       # which chip axes point forward / left / up (e.g. ["y", "-x", "z"])
+    "ins_spoof_action": "switch",       # "switch": ignore a suspect GPS and carry on by dead reckoning; "warn": only warn
+    "ins_compass_sigma": 6.0,           # degrees; raise it on a steel boat with a poor compass
+    "ins_max_speed_ms": 60.0,           # a GPS position change faster than this is a jump (fake or glitch)
     "weather_interval_s": 600,
     "forecast_auto_download": True,     # opportunistic: refresh the forecast whenever internet happens to be there
     "forecast_grid_half": 2,            # 5x5 grid of points around you
@@ -166,9 +172,27 @@ class App:
         threading.Thread(target=audio.setup_playback, args=(self.config["audio_device"], cap), daemon=True).start()
 
         # dead reckoning: keeps an estimated position when GPS has no fix
+        def compass_true():
+            try:
+                return self.compass.heading() if self.compass.available else None
+            except OSError:
+                return None
+
+        def dr_ref():
+            return self.dr.reference() if getattr(self, "dr", None) is not None else None
+
+        self.ins = ins_mod.INS(self.imu if self.config["ins_enabled"] else None, compass_true, self.gps.get,
+                               (self.get_setting, self.set_setting), get_sea=lambda: getattr(self, "dr", None) is not None and self.dr.mode in ("boat", "vehicle"),
+                               get_vehicle=lambda: getattr(self, "dr", None) is not None and self.dr.mode == "vehicle",
+                               get_steps=lambda: self.dr.steps.count if getattr(self, "dr", None) is not None and self.dr.mode == "foot" else None,
+                               get_ref=dr_ref, mount=self.config["ins_mount"],
+                               spoof_action=self.config["ins_spoof_action"],
+                               compass_sigma=self.config["ins_compass_sigma"], max_speed=self.config["ins_max_speed_ms"])
         self.dr = deadreck.DeadReckoner(self.imu, self.gps.get, lambda: self.heading()["heading"],
-                                        lambda: self.get_setting("manual_pos"), (self.get_setting, self.set_setting))
+                                        lambda: self.get_setting("manual_pos"), (self.get_setting, self.set_setting),
+                                        ins=self.ins)
         self.dr.start()
+        self.ins.start()
         threading.Thread(target=self._clock_from_gps, daemon=True).start()
         self.mesh = mesh_mod.Mesh(self.config["meshtastic_port"], get_position=self.position)
         self.mesh.start()
@@ -473,7 +497,8 @@ class App:
     def position(self):
         """GPS fix if there is one, else the position you set by hand on the map."""
         f = self.gps.get()
-        if f.get("mode", 0) >= 2 and f.get("lat") is not None:
+        ins = getattr(self, "ins", None)
+        if f.get("mode", 0) >= 2 and f.get("lat") is not None and (ins is None or ins.gps_trusted(f)):
             return f["lat"], f["lon"]
         dr = getattr(self, "dr", None)
         e = dr.estimate() if dr else None
@@ -504,6 +529,9 @@ class App:
     def heading(self):
         h = None
         src = None
+        ins = getattr(self, "ins", None)
+        if ins is not None and ins.heading() is not None:
+            return {"heading": ins.heading(), "heading_source": "ins", "compass": self.compass.available}
         if self.compass.available:
             try:
                 h, src = self.compass.heading(), "compass"
@@ -705,8 +733,11 @@ class Handler(BaseHTTPRequestHandler):
             if p == "/api/status":
                 return self._send(200, app.status())
             if p == "/api/gps":
-                return self._send(200, dict(app.gps.get(), manual_pos=app.get_setting("manual_pos"),
-                                           dr=app.dr.estimate(), **app.heading()))
+                f = app.gps.get()
+                return self._send(200, dict(f, manual_pos=app.get_setting("manual_pos"), dr=app.dr.estimate(),
+                                           gps_suspect=not app.ins.gps_trusted(f), ins=app.ins.status(), **app.heading()))
+            if p == "/api/ins":
+                return self._send(200, app.ins.status())
             if p == "/api/dr":
                 return self._send(200, app.dr.status())
             if p == "/api/track":
@@ -883,6 +914,17 @@ class Handler(BaseHTTPRequestHandler):
             if p == "/api/dr":
                 app.dr.set_mode(b["mode"], b.get("speed_kn"), b.get("course"))
                 return self._send(200, app.dr.status())
+            if p == "/api/ins":
+                act = b.get("action")
+                if act == "realign":
+                    app.ins.realign()
+                elif act == "trust_gps":
+                    app.ins.trust_gps()
+                elif act == "heading":
+                    app.ins.set_heading(float(b["deg"]))
+                else:
+                    return self._send(400, {"error": "bad request: unknown action"})
+                return self._send(200, app.ins.status())
             if p == "/api/position":
                 if b.get("clear"):
                     app.set_setting("manual_pos", None)
